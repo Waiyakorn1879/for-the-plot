@@ -1,0 +1,25 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Game content must never be committed (copyright)
+*.rpa
+*.rpyc
+*_translations.json
+strings.json
+decompiled/
+*_sources/
+output/
+
+# Fonts are licensed separately — link, don't ship
+*.ttf
+*.otf
+
+# Editor noise
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

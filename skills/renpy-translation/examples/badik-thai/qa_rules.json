@@ -1,0 +1,74 @@
+{
+  "window": 12,
+  "roman_check": true,
+  "truncation_ratio": 0.28,
+  "truncation_min_len": 20,
+  "groups": {
+    "phom_group": ["isa", "ca", "ji", "cam", "ar", "he", "ash"],
+    "rao_group": ["my", "js", "ri", "ml", "sar"],
+    "sage_group": ["sa"],
+    "dad_group": ["dad"],
+    "chan_females": ["my", "js", "ji", "ri", "ca", "isa", "ml", "cam", "ar", "he", "ash"]
+  },
+  "rules": [
+    {
+      "name": "ผม-group กู",
+      "category": 2,
+      "speakers": ["mc"],
+      "skip_monologue": true,
+      "pattern": "กู(?![้ล])",
+      "near": { "group": "phom_group", "min": 2, "dominant_over": ["rao_group", "sage_group"] }
+    },
+    {
+      "name": "เรา-group กู",
+      "category": 2,
+      "speakers": ["mc"],
+      "skip_monologue": true,
+      "pattern": "กู(?![้ล])",
+      "near": { "group": "rao_group", "min": 2, "dominant_over": ["phom_group", "sage_group"] }
+    },
+    {
+      "name": "Sage-nearby กู",
+      "category": 2,
+      "speakers": ["mc"],
+      "skip_monologue": true,
+      "pattern": "กู(?![้ล])",
+      "near": { "group": "sage_group", "min": 1 }
+    },
+    {
+      "name": "Sage-nearby มึง",
+      "category": 2,
+      "speakers": ["mc"],
+      "skip_monologue": true,
+      "pattern": "มึง",
+      "near": { "group": "sage_group", "min": 1 }
+    },
+    {
+      "name": "Dad-nearby กู",
+      "category": 2,
+      "speakers": ["mc"],
+      "skip_monologue": true,
+      "pattern": "กู(?![้ล])",
+      "near": { "group": "dad_group", "min": 1 }
+    },
+    {
+      "name": "กู ← female",
+      "category": 3,
+      "speakers_group": "chan_females",
+      "skip_monologue": true,
+      "pattern": "กู(?![้ล])"
+    },
+    {
+      "name": "มึง ← female",
+      "category": 3,
+      "speakers_group": "chan_females",
+      "skip_monologue": true,
+      "pattern": "มึง"
+    },
+    {
+      "name": "awkward loanword",
+      "category": 4,
+      "pattern": "เลเวล|สกอร์|บัฟ|เกมเพลย์"
+    }
+  ]
+}

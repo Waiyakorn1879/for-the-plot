@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Ren'Py translation game profile",
+  "description": "Per-game/per-language config consumed by extract_strings.py, translate_api.py, qa_check.py, and build_patch.py. All relative paths are resolved against the profile file's directory.",
+  "type": "object",
+  "required": ["game_name", "language_id"],
+  "properties": {
+    "game_name": {
+      "type": "string",
+      "description": "Display name of the game, e.g. \"Being a DIK\""
+    },
+    "language_id": {
+      "type": "string",
+      "description": "Ren'Py language key; also the patch folder name game/tl/<language_id>/. Lowercase, no spaces, e.g. \"thai\", \"french\""
+    },
+    "language_name": {
+      "type": "string",
+      "description": "Human-readable target language name, e.g. \"Thai\""
+    },
+    "source_dir": {
+      "type": "string",
+      "description": "Directory of decompiled .rpy source files",
+      "default": "decompiled"
+    },
+    "strings_file": {
+      "type": "string",
+      "description": "Extracted strings JSON (output of extract_strings.py)",
+      "default": "strings.json"
+    },
+    "progress_file": {
+      "type": "string",
+      "description": "Translations JSON: {english: translation}. Written incrementally; resumable.",
+      "default": "translations.json"
+    },
+    "output_dir": {
+      "type": "string",
+      "description": "Where build_patch.py writes <output_dir>/tl/<language_id>/",
+      "default": "output"
+    },
+    "speakers": {
+      "type": "object",
+      "description": "Speaker code (as it appears in the .rpy scripts) -> character info. Feeds translation context and QA groups.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "gender": { "type": "string", "enum": ["male", "female", "?", ""] },
+          "role": { "type": "string", "description": "One-line description: relationship to protagonist, personality, register hints" }
+        },
+        "required": ["name"]
+      }
+    },
+    "keep_untranslated": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Names and proper nouns that must stay exactly as written (no translation/transliteration). Also whitelists them for qa_check's untranslated-roman-word check."
+    },
+    "style_guide_file": {
+      "type": "string",
+      "description": "Markdown style guide (registers, formality, slang policy, few-shot examples). Loaded into the system prompt by translate_api.py and into context for in-session translation."
+    },
+    "qa_rules_file": {
+      "type": "string",
+      "description": "Declarative register/phrasing rules for qa_check.py. See references/qa.md."
+    },
+    "font": {
+      "type": "object",
+      "description": "Omit entirely if the game's fonts already cover the target script.",
+      "required": ["regular"],
+      "properties": {
+        "regular": { "type": "string", "description": "Target-script font filename (must be copied into game/)" },
+        "italic": { "type": "string", "description": "Italic variant; defaults to regular" },
+        "replace_fonts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The game's original font files to substitute via config.font_replacement_map"
+        },
+        "size_scale": {
+          "type": "number",
+          "default": 1.0,
+          "description": "Multiplier applied to base_sizes when the target language is active (some fonts render smaller at the same point size)"
+        },
+        "base_sizes": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" },
+          "description": "Style name -> the game's original point size for that style"
+        },
+        "styles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Style names to override; defaults to the common Ren'Py text styles"
+        }
+      }
+    },
+    "toggle_key": {
+      "type": "string",
+      "default": "K_F11",
+      "description": "pygame key constant for the in-game language toggle"
+    },
+    "auto_set_language": {
+      "type": "boolean",
+      "default": false,
+      "description": "Switch the game to the target language automatically on first launch (useful when the game has no language picker in Preferences)"
+    },
+    "api": {
+      "type": "object",
+      "description": "Settings for translate_api.py (bulk first-pass only)",
+      "properties": {
+        "provider": { "type": "string", "default": "gemini" },
+        "model": { "type": "string", "default": "gemini-2.5-pro" },
+        "batch_size": { "type": "integer", "default": 20 },
+        "temperature": { "type": "number", "default": 0.3 }
+      }
+    }
+  }
+}

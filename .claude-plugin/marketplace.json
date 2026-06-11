@@ -1,0 +1,14 @@
+{
+  "name": "for-the-plot",
+  "owner": { "name": "desdeadra" },
+  "metadata": {
+    "description": "Ren'Py visual novel translation tooling — you came for the porn, we translated the plot."
+  },
+  "plugins": [
+    {
+      "name": "for-the-plot",
+      "source": "./",
+      "description": "Full workflow for translating Ren'Py visual novels into any language — extraction, game profiles, translation, QA, and runtime patches."
+    }
+  ]
+}
