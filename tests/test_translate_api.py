@@ -81,3 +81,41 @@ class TestSystemInstruction:
 class TestProviderRegistry:
     def test_known_providers_registered(self):
         assert set(translate_api.PROVIDERS) >= {"gemini", "anthropic", "claude-cli"}
+
+
+class TestExtractJsonArray:
+    ARRAY = [{"id": 0, "tr": "Salut !"}]
+    ARRAY_JSON = json.dumps(ARRAY)
+
+    def test_clean(self):
+        assert translate_api.extract_json_array(self.ARRAY_JSON) == self.ARRAY
+
+    def test_banner_before(self):
+        raw = "New version available! Run npm update.\n" + self.ARRAY_JSON
+        assert translate_api.extract_json_array(raw) == self.ARRAY
+
+    def test_chatter_after(self):
+        raw = self.ARRAY_JSON + "\n\nLet me know if you need anything else!"
+        assert translate_api.extract_json_array(raw) == self.ARRAY
+
+    def test_ansi_codes_stripped(self):
+        raw = "\x1b[32mDone:\x1b[0m " + self.ARRAY_JSON + " \x1b]0;title\x07"
+        assert translate_api.extract_json_array(raw) == self.ARRAY
+
+    def test_fenced(self):
+        raw = "```json\n" + self.ARRAY_JSON + "\n```"
+        assert translate_api.extract_json_array(raw) == self.ARRAY
+
+    def test_banner_with_brackets_before_array(self):
+        raw = "[INFO] warming up\n" + self.ARRAY_JSON
+        assert translate_api.extract_json_array(raw) == self.ARRAY
+
+    def test_object_reply_rejected(self):
+        assert translate_api.extract_json_array('{"id": 0, "tr": "x"}') == []
+
+    def test_garbage_rejected(self):
+        assert translate_api.extract_json_array("no json here at all") == []
+
+    def test_strings_inside_array_with_brackets(self):
+        arr = [{"id": 0, "tr": "Use [item_name] {b}now{/b}"}]
+        assert translate_api.extract_json_array(json.dumps(arr)) == arr

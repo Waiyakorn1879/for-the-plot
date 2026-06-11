@@ -117,7 +117,8 @@
           "description": "Defaults per provider: gemini → gemini-2.5-pro, anthropic → claude-sonnet-4-6, claude-cli → sonnet"
         },
         "batch_size": { "type": "integer", "default": 20 },
-        "temperature": { "type": "number", "default": 0.3, "description": "Ignored by claude-cli" }
+        "temperature": { "type": "number", "default": 0.3, "description": "Ignored by claude-cli" },
+        "timeout": { "type": "integer", "default": 600, "description": "Per-call timeout in seconds (claude-cli provider)" }
       }
     }
   }

@@ -29,7 +29,14 @@ def load_profile(path):
 
 def py2_unicode_repr(s):
     """Emit u'...' literal that is valid in both py2 and py3 Ren'Py.
-    Escape backslashes and single quotes; leave non-ASCII chars raw (file is UTF-8)."""
+    Escape backslashes and single quotes; leave non-ASCII chars raw (file is UTF-8).
+
+    Known limitation (accepted): a literal double-backslash in the SOURCE
+    text (e.g. a Windows path in dialog) is emitted double-escaped and the
+    dict key won't match at runtime. Never observed in real VN dialog
+    (0 of 36k strings in the reference project); this function is
+    parity-locked against that proven output — do not "fix" without
+    re-running the full parity regression."""
     s = s.replace("\\", "\\\\").replace("'", "\\'")
     # Source data carries literal \n etc. as the 2-char sequence "\\n" from the
     # rpy file; the escaping above turned that into "\\\\n". Reverse it so the
@@ -42,13 +49,36 @@ def py2_unicode_repr(s):
 
 
 def renpy_string_literal(s):
-    """Emit a double-quoted Ren'Py string literal for translate-strings blocks.
-    Same escape handling as py2_unicode_repr, but for the "..." form."""
+    """Emit a double-quoted Ren'Py string literal for the `new` side of
+    translate-strings blocks. Input is translator/runtime text where typed
+    escape sequences (\\n etc.) are intended as escapes and a lone backslash
+    must survive — same contract as py2_unicode_repr."""
     s = s.replace("\\", "\\\\").replace('"', '\\"')
     # Escapes that were already escapes in the extracted source stay escapes.
     s = s.replace("\\\\n", "\\n").replace("\\\\t", "\\t").replace('\\\\\\"', '\\"')
     # Real control chars must not break the literal.
     s = s.replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n").replace("\t", "\\t")
+    return '"' + s + '"'
+
+
+_SOURCE_ESCAPE_RE = re.compile(r'\\(.)')
+
+
+def _decode_source_escapes(s):
+    """Raw text between quotes in .rpy source -> the engine-decoded string."""
+    return _SOURCE_ESCAPE_RE.sub(
+        lambda m: {"n": "\n", "t": "\t"}.get(m.group(1), m.group(1)), s)
+
+
+def renpy_source_literal(s):
+    """Literal for the `old` side of translate-strings blocks. Input is the
+    extractor's RAW source text (escapes undecoded); `old` must match the
+    engine-decoded string exactly, so decode once and re-encode cleanly —
+    deterministic for any nesting depth, including literal backslashes."""
+    s = _decode_source_escapes(s)
+    s = (s.replace("\\", "\\\\").replace('"', '\\"')
+          .replace("\r\n", "\\n").replace("\r", "\\n")
+          .replace("\n", "\\n").replace("\t", "\\t"))
     return '"' + s + '"'
 
 
@@ -264,7 +294,7 @@ def build_strings_rpy(strings_translations, lang, lang_name):
         f"translate {lang} strings:\n",
     ]
     for eng, tr in strings_translations.items():
-        lines.append(f"\n    old {renpy_string_literal(eng)}\n")
+        lines.append(f"\n    old {renpy_source_literal(eng)}\n")
         lines.append(f"    new {renpy_string_literal(tr)}\n")
     return "".join(lines)
 

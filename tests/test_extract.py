@@ -122,8 +122,25 @@ class TestScreensMode:
 
     def test_ui_strings(self):
         ui_texts = texts(self.entries, "ui")
-        assert sorted(ui_texts) == ["Overwrite?", "Pocket Cafe", "Saved to slot one"]
+        assert sorted(ui_texts) == [
+            "Overwrite?", "Pocket Cafe", "Saved to slot one",
+            'She yelled, \\"Watch out for [enemy_name]!\\"',
+            'Single quoted with "inner" quotes',
+        ]
         assert all(e["speaker"] == "_ui" for e in self.entries if e["kind"] == "ui")
+
+    def test_nested_escaped_quotes_in_underscore(self):
+        # The audit example: tokens and escapes must survive extraction raw.
+        nested = [t for t in texts(self.entries, "ui") if t.startswith("She yelled")]
+        assert nested == ['She yelled, \\"Watch out for [enemy_name]!\\"']
+        assert "[enemy_name]" in nested[0]
+
+    def test_single_quoted_underscore_extracted(self):
+        assert 'Single quoted with "inner" quotes' in texts(self.entries, "ui")
+
+    def test_underscore_text_lines_not_double_counted_as_screen(self):
+        screen_texts = texts(self.entries, "screen")
+        assert not any("She yelled" in t for t in screen_texts)
 
     def test_say_outside_screen_still_extracted(self):
         assert texts(self.entries, "say") == ["Back to dialog."]

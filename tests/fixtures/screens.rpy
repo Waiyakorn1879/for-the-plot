@@ -15,6 +15,10 @@ screen status_panel():
 screen empty_panel():
     text ""
 
+screen warning_box():
+    text _("She yelled, \"Watch out for [enemy_name]!\"")
+    text _('Single quoted with "inner" quotes')
+
 label after_screens:
     $ note = _("Saved to slot one") + _("Overwrite?")
     hero "Back to dialog."

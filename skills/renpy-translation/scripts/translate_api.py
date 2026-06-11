@@ -31,6 +31,36 @@ VAR_RE = re.compile(r'\[[^\]]+\]')
 TAG_RE = re.compile(r'\{[^}]+\}')
 ESC_RE = re.compile(r'\\[n"\'\\]')
 
+# ANSI CSI and OSC escape sequences (colors, cursor moves, window titles)
+ANSI_RE = re.compile(r'\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)')
+
+
+def extract_json_array(raw):
+    """Parse the first JSON array out of a possibly noisy model reply.
+
+    Survives ANSI color codes, version banners or warnings before/after the
+    array, code fences, and trailing chatter. Returns [] when no array exists.
+    """
+    raw = ANSI_RE.sub("", raw).strip()
+    if raw.startswith("```"):
+        raw = re.sub(r'^```\w*\n|```$', '', raw, flags=re.MULTILINE).strip()
+    try:
+        result = json.loads(raw)
+        return result if isinstance(result, list) else []
+    except json.JSONDecodeError:
+        pass
+    decoder = json.JSONDecoder()
+    idx = raw.find("[")
+    while idx != -1:
+        try:
+            result, _end = decoder.raw_decode(raw, idx)
+            if isinstance(result, list):
+                return result
+        except json.JSONDecodeError:
+            pass
+        idx = raw.find("[", idx + 1)
+    return []
+
 TOKEN_RULES = """
 TOKEN PRESERVATION (critical — broken tokens crash the game):
 - Preserve the EXACT same number and order of these tokens:
@@ -167,20 +197,39 @@ def _provider_claude_cli(profile):
     the user's existing subscription. No API key needed."""
     import shutil
     import subprocess
+    import tempfile
 
     api = profile.get("api", {})
     exe = shutil.which("claude")
     if not exe:
         sys.exit("claude CLI not found on PATH (install Claude Code, or pick another provider)")
     model = api.get("model", "sonnet")
+    timeout = api.get("timeout", 600)
+
+    # Feature-detect optional flags once (offline, no API call) so we stay
+    # compatible with older CLI versions that lack them.
+    help_text = subprocess.run([exe, "-p", "--help"], capture_output=True,
+                               text=True, encoding="utf-8", errors="replace").stdout
+    extra = []
+    if "--max-turns" in help_text:
+        extra += ["--max-turns", "1"]        # no agentic tool-use loops
+    if "--output-format" in help_text:
+        extra += ["--output-format", "text"]
+
+    # Neutral cwd: don't let the work folder's CLAUDE.md / plugins / hooks
+    # load into every call (token bloat + possible instruction injection).
+    neutral_cwd = tempfile.gettempdir()
 
     def call_model(system, user):
-        # System instruction is merged into the prompt: works on every CLI
-        # version and avoids command-line length limits by using stdin.
+        # One-shot session per call (no --continue/--resume): stateless by
+        # construction, so context can never accumulate across batches.
+        # System prompt is merged into the prompt and sent via stdin:
+        # version-proof and immune to command-line length limits.
         proc = subprocess.run(
-            [exe, "-p", "--model", model],
+            [exe, "-p", "--model", model, *extra],
             input=system + "\n\n" + user,
-            text=True, encoding="utf-8", capture_output=True,
+            text=True, encoding="utf-8", errors="replace",
+            capture_output=True, cwd=neutral_cwd, timeout=timeout,
         )
         if proc.returncode != 0:
             raise RuntimeError(f"claude CLI exited {proc.returncode}: {proc.stderr[:300]}")
@@ -226,15 +275,11 @@ def translate_batch(call_model, system, speakers, lang_name, batch, retry=False)
         user_msg += "\n\nIMPORTANT: Your previous output had mismatched Ren'Py tokens. " \
                     "Each output MUST contain the EXACT same [variables], {tags}, and \\escapes as the English."
 
-    raw = call_model(system, user_msg).strip()
-    # Strip code fences if any
-    if raw.startswith("```"):
-        raw = re.sub(r'^```\w*\n|```$', '', raw, flags=re.MULTILINE).strip()
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as e:
-        print(f"  JSON parse error: {e}\n  Raw: {raw[:300]}...")
-        return []
+    raw = call_model(system, user_msg)
+    result = extract_json_array(raw)
+    if not result:
+        print(f"  No JSON array in reply. Raw: {raw.strip()[:300]}...")
+    return result
 
 
 def main():

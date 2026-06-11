@@ -55,6 +55,37 @@ class TestRenpyStringLiteral:
         assert build_patch.renpy_string_literal("a\nb") == '"a\\nb"'
 
 
+class TestRenpySourceLiteral:
+    """`old`-side literal: decode raw source escapes, re-encode cleanly."""
+
+    def test_plain(self):
+        assert build_patch.renpy_source_literal("hello") == '"hello"'
+
+    def test_audit_nested_quotes_example(self):
+        raw = 'She yelled, \\"Watch out for [enemy_name]!\\"'
+        assert build_patch.renpy_source_literal(raw) == \
+            '"She yelled, \\"Watch out for [enemy_name]!\\""'
+
+    def test_unescaped_quotes_from_single_quoted_source(self):
+        assert build_patch.renpy_source_literal('with "inner" quotes') == \
+            '"with \\"inner\\" quotes"'
+
+    def test_source_newline_escape(self):
+        assert build_patch.renpy_source_literal("a\\nb") == '"a\\nb"'
+
+    def test_literal_double_backslash(self):
+        # Source raw `path\\end` decodes to a single backslash in the engine;
+        # the emitted literal must round-trip to exactly that.
+        assert build_patch.renpy_source_literal("path\\\\end") == '"path\\\\end"'
+
+    def test_real_newline(self):
+        assert build_patch.renpy_source_literal("a\nb") == '"a\\nb"'
+
+    def test_tokens_untouched(self):
+        out = build_patch.renpy_source_literal("Use [item] {b}now{/b}")
+        assert out == '"Use [item] {b}now{/b}"'
+
+
 class TestFilterGeneration:
     BASE = {"game_name": "Pocket Cafe", "language_id": "french",
             "language_name": "French"}
@@ -148,6 +179,28 @@ class TestKindRouting:
         assert '    old "Continue"' in strings_content
         assert '    new "Continuer"' in strings_content
         assert '    old "Pocket Cafe"' in strings_content
+
+    def test_nested_quote_string_end_to_end(self, tmp_path):
+        profile = {"game_name": "Pocket Cafe", "language_id": "french",
+                   "language_name": "French", "progress_file": "tr.json",
+                   "strings_file": "strings.json", "output_dir": "out"}
+        raw = 'She yelled, \\"Watch out for [enemy_name]!\\"'
+        tr = 'Elle a crié : \\"Attention à [enemy_name] !\\"'
+        (tmp_path / "profile.json").write_text(json.dumps(profile), encoding="utf-8")
+        (tmp_path / "tr.json").write_text(
+            json.dumps({raw: tr}, ensure_ascii=False), encoding="utf-8")
+        (tmp_path / "strings.json").write_text(json.dumps([
+            {"text": raw, "speaker": "_ui", "file": "s.rpy", "line": 1, "kind": "ui"},
+        ], ensure_ascii=False), encoding="utf-8")
+        subprocess.run(
+            [sys.executable, str(SCRIPTS_DIR / "build_patch.py"),
+             "--profile", str(tmp_path / "profile.json")],
+            check=True, capture_output=True, text=True, encoding="utf-8",
+        )
+        content = (tmp_path / "out" / "tl" / "french" / "02_french_strings.rpy"
+                   ).read_text(encoding="utf-8")
+        assert '    old "She yelled, \\"Watch out for [enemy_name]!\\""' in content
+        assert '    new "Elle a crié : \\"Attention à [enemy_name] !\\""' in content
 
     def test_no_strings_file_keeps_v10_behavior(self, tmp_path):
         out = self.run_build(tmp_path, with_strings=False)

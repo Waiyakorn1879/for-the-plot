@@ -44,8 +44,9 @@ SCREEN_START_RE = re.compile(r'^screen\s+\w+.*:\s*$')
 SCREEN_TEXT_RE = re.compile(
     r'^\s*(?:text|textbutton|label|tooltip)\s+"((?:[^"\\]|\\.)*)"'
 )
-# _("...") translatable-marked strings (several can share a line)
-UNDERSCORE_RE = re.compile(r'_\(\s*"((?:[^"\\]|\\.)*)"\s*\)')
+# _("...") / _('...') translatable-marked strings (several can share a line);
+# the trailing _( of __("...") matches too, covering the immediate form.
+UNDERSCORE_RE = re.compile(r'_\(\s*(["\'])((?:(?!\1)[^\\]|\\.)*)\1\s*\)')
 
 # tokens with no translatable content once vars/tags are stripped
 _VAR_TAG_RE = re.compile(r'\[[^\]]+\]|\{[^}]+\}')
@@ -81,7 +82,7 @@ def extract(rpy_path: Path, screens=False):
             # including python blocks and $ lines — scan before any skips.
             if screens and not stripped.startswith("#"):
                 for m in UNDERSCORE_RE.finditer(line):
-                    txt = m.group(1)
+                    txt = m.group(2)
                     if txt.strip() and has_translatable_content(txt):
                         out.append({"text": txt, "speaker": "_ui",
                                     "file": rpy_path.name, "line": lineno, "kind": "ui"})
