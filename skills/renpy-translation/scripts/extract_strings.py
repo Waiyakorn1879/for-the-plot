@@ -2,13 +2,18 @@
 
 Outputs a JSON list of {text, speaker, file, line, kind}
 - kind = "say" | "menu" | "text" | "narrator"
+- with --screens additionally: "screen" (literal text/textbutton/label/tooltip
+  inside screen blocks) and "ui" (_()-wrapped strings anywhere).
 Duplicates are skipped by exact text match unless --no-dedupe is given
 (keep duplicates when targeting native `translate` blocks, where each
 occurrence can translate differently).
 
+Note: "screen"/"ui" strings are NOT reachable by the runtime say filter —
+build_patch.py routes them into a `translate <lang> strings:` file instead.
+
 Usage:
   python extract_strings.py --src decompiled/ --out strings.json
-  python extract_strings.py --profile profile.json
+  python extract_strings.py --profile profile.json --screens
 """
 import argparse
 import json
@@ -33,6 +38,22 @@ MENU_RE = re.compile(
 SHOWTEXT_RE = re.compile(
     r'^(\s*)show\s+text\s+"((?:[^"\\]|\\.)*)"'
 )
+# screen definition header: `screen name(...):`
+SCREEN_START_RE = re.compile(r'^screen\s+\w+.*:\s*$')
+# literal-string screen statements: text/textbutton/label/tooltip "..."
+SCREEN_TEXT_RE = re.compile(
+    r'^\s*(?:text|textbutton|label|tooltip)\s+"((?:[^"\\]|\\.)*)"'
+)
+# _("...") translatable-marked strings (several can share a line)
+UNDERSCORE_RE = re.compile(r'_\(\s*"((?:[^"\\]|\\.)*)"\s*\)')
+
+# tokens with no translatable content once vars/tags are stripped
+_VAR_TAG_RE = re.compile(r'\[[^\]]+\]|\{[^}]+\}')
+
+
+def has_translatable_content(txt):
+    """False for pure-interpolation/markup strings like "[points]"."""
+    return any(c.isalnum() for c in _VAR_TAG_RE.sub("", txt))
 
 # Ren'Py keywords/commands that look like "speaker" but aren't
 NON_SPEAKERS = {
@@ -44,15 +65,26 @@ NON_SPEAKERS = {
 }
 
 
-def extract(rpy_path: Path):
+def extract(rpy_path: Path, screens=False):
     out = []
     in_python_block = False
     python_indent = None
+    in_screen_block = False
+    screen_indent = None
     with rpy_path.open(encoding="utf-8", errors="replace") as f:
         for lineno, raw in enumerate(f, 1):
             line = raw.rstrip("\n")
             stripped = line.lstrip()
             indent = len(line) - len(stripped)
+
+            # _( "..." ) strings are translatable wherever they appear,
+            # including python blocks and $ lines — scan before any skips.
+            if screens and not stripped.startswith("#"):
+                for m in UNDERSCORE_RE.finditer(line):
+                    txt = m.group(1)
+                    if txt.strip() and has_translatable_content(txt):
+                        out.append({"text": txt, "speaker": "_ui",
+                                    "file": rpy_path.name, "line": lineno, "kind": "ui"})
 
             # Track python blocks (skip them)
             if in_python_block:
@@ -67,6 +99,26 @@ def extract(rpy_path: Path):
                 continue  # python one-liner
             if stripped.startswith("#"):
                 continue  # comment
+
+            # Track screen blocks: inside them, only literal screen-language
+            # statements are translatable — say/menu/narrator regexes would
+            # misread them, so never fall through.
+            if screens:
+                if in_screen_block:
+                    if stripped == "" or indent > screen_indent:
+                        m = SCREEN_TEXT_RE.match(line)
+                        if m:
+                            txt = m.group(1)
+                            if txt.strip() and has_translatable_content(txt):
+                                out.append({"text": txt, "speaker": "_screen",
+                                            "file": rpy_path.name, "line": lineno,
+                                            "kind": "screen"})
+                        continue
+                    in_screen_block = False
+                if SCREEN_START_RE.match(stripped):
+                    in_screen_block = True
+                    screen_indent = indent
+                    continue
 
             # show text "..."
             m = SHOWTEXT_RE.match(line)
@@ -123,6 +175,9 @@ def main():
     ap.add_argument("--out", help="output JSON path (overrides profile strings_file)")
     ap.add_argument("--no-dedupe", action="store_true",
                     help="keep every occurrence instead of deduplicating by text")
+    ap.add_argument("--screens", action="store_true",
+                    help="also extract screen-language strings (text/textbutton/"
+                         "label/tooltip) and _()-wrapped strings")
     args = ap.parse_args()
 
     src = out = None
@@ -143,7 +198,7 @@ def main():
 
     all_entries = []
     for rpy in sorted(src.glob("*.rpy")):
-        entries = extract(rpy)
+        entries = extract(rpy, screens=args.screens)
         print(f"{rpy.name}: {len(entries)} strings")
         all_entries.extend(entries)
 

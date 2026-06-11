@@ -1,7 +1,7 @@
 {
   "name": "for-the-plot",
   "description": "Translate Ren'Py visual novels into any language: decompile, extract strings, build a game profile, translate (Claude in-session or API batch), QA, and ship a runtime translation patch. You came for the porn. We translated the plot.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": { "name": "desdeadra" },
   "repository": "https://github.com/Waiyakorn1879/for-the-plot",
   "license": "MIT",

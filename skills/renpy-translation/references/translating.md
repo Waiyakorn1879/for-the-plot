@@ -24,7 +24,16 @@ Quality rules that matter more than speed:
 python translate_api.py --profile profile.json
 ```
 
-- Needs `GEMINI_API_KEY` in env or `.env` (or adapt `make_call_model()` for another provider).
+Pick the provider in the profile (`api.provider`):
+
+| Provider | Needs | Default model | Notes |
+|---|---|---|---|
+| `claude-cli` | Claude Code installed | `sonnet` | **No API key** — headless `claude -p` on the user's existing subscription. Slowest per batch; great default when no key is available. |
+| `anthropic` | `pip install anthropic`, `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` | Fast, high register quality. |
+| `gemini` | `pip install google-genai`, `GEMINI_API_KEY` | `gemini-2.5-pro` | The original BaDIK pipeline provider. |
+
+New providers register in `PROVIDERS` in `translate_api.py` (a factory returning `call_model(system, user) -> str`).
+
 - Batches per `profile.api.batch_size`, injects speaker blurbs and the style guide into the prompt, validates token preservation, retries mismatches once, saves incrementally — safe to interrupt and rerun.
 - Strings that fail token validation twice stay untranslated (they'll display in the original language) — list them at the end from `strings.json` minus progress keys.
 

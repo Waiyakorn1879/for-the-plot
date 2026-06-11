@@ -9,9 +9,11 @@ This is the BULK path. Quality-critical dialog should be translated or
 reviewed by Claude in-session following the game's translation guide
 (see references/translating.md).
 
-Provider: Google Gemini by default (pip install google-genai python-dotenv,
-set GEMINI_API_KEY in env or .env). To use another provider, replace the
-body of call_model() — everything else is provider-agnostic.
+Providers (profile api.provider):
+  gemini      — Google Gemini API (pip install google-genai; GEMINI_API_KEY)
+  anthropic   — Anthropic API (pip install anthropic; ANTHROPIC_API_KEY)
+  claude-cli  — headless `claude -p` via the locally installed Claude Code CLI;
+                uses your existing subscription, NO API key needed
 
 Usage:
   python translate_api.py --profile profile.json
@@ -97,23 +99,18 @@ def speaker_blurb(speakers, code):
     return f"{name}{g}{r}"
 
 
-def make_call_model(profile):
-    """Return call_model(system, user) -> str for the configured provider.
-
-    To swap providers, return a function with the same signature that sends
-    `system` as the system prompt and `user` as the user message and returns
-    the raw text reply (a JSON array).
-    """
-    api = profile.get("api", {})
-    provider = api.get("provider", "gemini")
-    if provider != "gemini":
-        sys.exit(f"unsupported provider '{provider}' — edit make_call_model() in {__file__}")
-
+def _load_dotenv():
     try:
         from dotenv import load_dotenv
         load_dotenv()
     except ImportError:
         pass
+
+
+def _provider_gemini(profile):
+    """Google Gemini API. pip install google-genai; GEMINI_API_KEY in env/.env."""
+    api = profile.get("api", {})
+    _load_dotenv()
     from google import genai
     from google.genai import types
 
@@ -137,6 +134,80 @@ def make_call_model(profile):
         return resp.text
 
     return call_model
+
+
+def _provider_anthropic(profile):
+    """Anthropic API. pip install anthropic; ANTHROPIC_API_KEY in env/.env."""
+    api = profile.get("api", {})
+    _load_dotenv()
+    import anthropic
+
+    key = os.getenv("ANTHROPIC_API_KEY")
+    if not key:
+        sys.exit("ANTHROPIC_API_KEY not set (env or .env)")
+    client = anthropic.Anthropic(api_key=key)
+    model = api.get("model", "claude-sonnet-4-6")
+    temperature = api.get("temperature", 0.3)
+
+    def call_model(system, user):
+        resp = client.messages.create(
+            model=model,
+            system=system,
+            max_tokens=8192,
+            temperature=temperature,
+            messages=[{"role": "user", "content": user}],
+        )
+        return resp.content[0].text
+
+    return call_model
+
+
+def _provider_claude_cli(profile):
+    """Headless `claude -p` — uses the locally installed Claude Code CLI and
+    the user's existing subscription. No API key needed."""
+    import shutil
+    import subprocess
+
+    api = profile.get("api", {})
+    exe = shutil.which("claude")
+    if not exe:
+        sys.exit("claude CLI not found on PATH (install Claude Code, or pick another provider)")
+    model = api.get("model", "sonnet")
+
+    def call_model(system, user):
+        # System instruction is merged into the prompt: works on every CLI
+        # version and avoids command-line length limits by using stdin.
+        proc = subprocess.run(
+            [exe, "-p", "--model", model],
+            input=system + "\n\n" + user,
+            text=True, encoding="utf-8", capture_output=True,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"claude CLI exited {proc.returncode}: {proc.stderr[:300]}")
+        return proc.stdout
+
+    return call_model
+
+
+PROVIDERS = {
+    "gemini": _provider_gemini,
+    "anthropic": _provider_anthropic,
+    "claude-cli": _provider_claude_cli,
+}
+
+
+def make_call_model(profile):
+    """Return call_model(system, user) -> str for the profile's api.provider.
+
+    To add a provider, register a factory in PROVIDERS that returns a function
+    sending `system` as the system prompt and `user` as the user message and
+    returning the raw text reply (a JSON array).
+    """
+    provider = profile.get("api", {}).get("provider", "gemini")
+    factory = PROVIDERS.get(provider)
+    if factory is None:
+        sys.exit(f"unsupported provider '{provider}' — known: {', '.join(sorted(PROVIDERS))}")
+    return factory(profile)
 
 
 def translate_batch(call_model, system, speakers, lang_name, batch, retry=False):

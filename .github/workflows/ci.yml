@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install pytest
+      - run: pytest -v
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sanity-check plugin manifests
+        run: |
+          python - <<'EOF'
+          import json
+          plugin = json.load(open(".claude-plugin/plugin.json"))
+          market = json.load(open(".claude-plugin/marketplace.json"))
+          assert plugin["name"] == "for-the-plot"
+          assert plugin["version"]
+          assert market["name"] and market["owner"]["name"]
+          assert any(p["name"] == "for-the-plot" for p in market["plugins"])
+          schema = json.load(open("skills/renpy-translation/scripts/profile_schema.json"))
+          assert schema["properties"]["language_id"]
+          print("manifests OK")
+          EOF
+
+  # Advisory only: claude plugin validate from a clean npm install.
+  # Unauthenticated CLI behavior in CI is not guaranteed, so failures here
+  # don't fail the build.
+  plugin-validate:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate .

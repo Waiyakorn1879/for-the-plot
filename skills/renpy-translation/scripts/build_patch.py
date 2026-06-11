@@ -3,6 +3,9 @@
 Output (into <out>/tl/<language_id>/):
   00_<lang>_filter.rpy   — text filter + toggle key + optional font swap
   01_<lang>_dict.rpy     — generated translation dictionary (optionally split)
+  02_<lang>_strings.rpy  — `translate <lang> strings:` blocks for screen/ui
+                           kinds (only when a strings file with such kinds
+                           is available; see extract_strings.py --screens)
 
 Approach: config.say_menu_text_filter as a runtime translator.
 No hash/ID generation needed; no game source modification. The filter
@@ -36,6 +39,17 @@ def py2_unicode_repr(s):
     # the data so they don't break the single-line string literal.
     s = s.replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n").replace("\t", "\\t")
     return "u'" + s + "'"
+
+
+def renpy_string_literal(s):
+    """Emit a double-quoted Ren'Py string literal for translate-strings blocks.
+    Same escape handling as py2_unicode_repr, but for the "..." form."""
+    s = s.replace("\\", "\\\\").replace('"', '\\"')
+    # Escapes that were already escapes in the extracted source stay escapes.
+    s = s.replace("\\\\n", "\\n").replace("\\\\t", "\\t").replace('\\\\\\"', '\\"')
+    # Real control chars must not break the literal.
+    s = s.replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n").replace("\t", "\\t")
+    return '"' + s + '"'
 
 
 def build_filter_rpy(profile):
@@ -243,10 +257,25 @@ def build_dict_rpy(translations, ident, lang_name, chunk=None):
         yield fi, "".join(lines)
 
 
+def build_strings_rpy(strings_translations, lang, lang_name):
+    lines = [
+        f"# {lang_name} screen/UI string translations — auto-generated\n",
+        "# DO NOT EDIT BY HAND\n\n",
+        f"translate {lang} strings:\n",
+    ]
+    for eng, tr in strings_translations.items():
+        lines.append(f"\n    old {renpy_string_literal(eng)}\n")
+        lines.append(f"    new {renpy_string_literal(tr)}\n")
+    return "".join(lines)
+
+
 def main():
     ap = argparse.ArgumentParser(description="Build a runtime-filter Ren'Py translation patch")
     ap.add_argument("--profile", required=True, help="profile.json")
     ap.add_argument("--translations", help="translations JSON (overrides profile progress_file)")
+    ap.add_argument("--strings", help="strings JSON from extract_strings.py; screen/ui kinds "
+                                      "are routed into a translate-strings file "
+                                      "(defaults to profile strings_file when it exists)")
     ap.add_argument("--out", help="output dir (overrides profile output_dir); patch goes to <out>/tl/<lang>/")
     ap.add_argument("--split-size", type=int, default=0,
                     help="max entries per dict file (0 = single file)")
@@ -265,14 +294,32 @@ def main():
     translations = json.loads(trans_path.read_text(encoding="utf-8"))
     print(f"Building patch with {len(translations)} translations...")
 
+    # Route screen/ui kinds (which the say filter can't reach) into a
+    # translate-strings file, when kind metadata is available.
+    strings_path = Path(args.strings) if args.strings else base / profile.get("strings_file", "strings.json")
+    strings_translations = {}
+    if strings_path.is_file():
+        entries = json.loads(strings_path.read_text(encoding="utf-8"))
+        for e in entries:
+            if e.get("kind") in ("screen", "ui") and e["text"] in translations:
+                strings_translations[e["text"]] = translations[e["text"]]
+    dict_translations = {k: v for k, v in translations.items()
+                         if k not in strings_translations}
+
     filter_path = out_dir / f"00_{ident}_filter.rpy"
     filter_path.write_text(build_filter_rpy(profile), encoding="utf-8")
     print(f"Wrote {filter_path}")
 
-    for fi, content in build_dict_rpy(translations, ident, lang_name, args.split_size):
+    for fi, content in build_dict_rpy(dict_translations, ident, lang_name, args.split_size):
         dict_path = out_dir / f"{fi + 1:02d}_{ident}_dict.rpy"
         dict_path.write_text(content, encoding="utf-8")
         print(f"Wrote {dict_path}")
+
+    if strings_translations:
+        strings_out = out_dir / f"02_{ident}_strings.rpy"
+        strings_out.write_text(
+            build_strings_rpy(strings_translations, lang, lang_name), encoding="utf-8")
+        print(f"Wrote {strings_out} ({len(strings_translations)} screen/UI strings)")
 
     print(f"\nDeploy: copy {out_dir} into the game's game/tl/ folder "
           f"(and the target font files into game/).")

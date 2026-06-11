@@ -7,7 +7,8 @@ python build_patch.py --profile profile.json
 Writes to `<output_dir>/tl/<language_id>/`:
 
 - `00_<lang>_filter.rpy` — installs a `config.say_menu_text_filter` hook (exact-match dict lookup, active only when `preferences.language == "<lang>"`), a toggle key, optional auto-set-on-first-launch, and the optional font swap.
-- `01_<lang>_dict.rpy` (`02_`, ... with `--split-size`) — the generated English→target dictionary. `init 0`, so it loads after the filter's `init -1` bootstrap.
+- `01_<lang>_dict.rpy` (more parts with `--split-size`) — the generated English→target dictionary. `init 0`, so it loads after the filter's `init -1` bootstrap.
+- `02_<lang>_strings.rpy` — only when the strings file (profile `strings_file` or `--strings`) contains `screen`/`ui` kinds with translations: a `translate <lang> strings:` block of `old`/`new` pairs. This is Ren'Py's native string-translation mechanism — it's what reaches screen-language text and `_()` strings, which the say filter cannot. Those texts are excluded from the runtime dict.
 
 ## How the filter behaves (design decisions worth knowing)
 
@@ -29,4 +30,4 @@ With a `font` section in the profile, the filter also: overrides the `font` (and
 
 ## Custom text subsystems (phones, computers, social feeds)
 
-Text rendered by custom `screen`s or Python code never passes through `say_menu_text_filter`. Per subsystem: find where the text is produced (search the decompiled sources for the screen/function), then wrap that producer — e.g. a `NN_<subsystem>_dict.rpy` with its own lookup dict and a thin wrapper around the original function, dropped into the same `tl/<lang>/` folder. Budget real time for this: in Being a DIK, the phone chat system needed its own dicts plus wrapper functions per season. Confirm scope with the user before committing to it.
+Text built dynamically in Python (chat histories, feed posts) is reachable by neither the say filter nor `translate strings`. It needs the wrapper-sub-dict pattern — full recipe with a proven code template in `custom-subsystems.md`. Budget real time for this and confirm scope with the user before committing to it.

@@ -49,6 +49,8 @@ Exit code is 1 while "hard" (non-review) issues remain — usable as a gate befo
 }
 ```
 
+Screen/UI strings (kinds `screen`/`ui`, speakers `_screen`/`_ui` from `--screens` extraction) are covered by the technical, roman, and truncation checks like everything else. Register rules with a `speakers`/`speakers_group` restriction never match them; rules **without** a speaker restriction do — scope phrasing rules accordingly.
+
 Rule semantics — a rule fires when ALL of these hold:
 
 - `speakers` / `speakers_group`: the line's speaker is in the list/named group (omit → any speaker)

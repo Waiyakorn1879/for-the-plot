@@ -106,10 +106,18 @@
       "type": "object",
       "description": "Settings for translate_api.py (bulk first-pass only)",
       "properties": {
-        "provider": { "type": "string", "default": "gemini" },
-        "model": { "type": "string", "default": "gemini-2.5-pro" },
+        "provider": {
+          "type": "string",
+          "enum": ["gemini", "anthropic", "claude-cli"],
+          "default": "gemini",
+          "description": "claude-cli uses the locally installed Claude Code CLI headlessly — no API key needed"
+        },
+        "model": {
+          "type": "string",
+          "description": "Defaults per provider: gemini → gemini-2.5-pro, anthropic → claude-sonnet-4-6, claude-cli → sonnet"
+        },
         "batch_size": { "type": "integer", "default": 20 },
-        "temperature": { "type": "number", "default": 0.3 }
+        "temperature": { "type": "number", "default": 0.3, "description": "Ignored by claude-cli" }
       }
     }
   }
