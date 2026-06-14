@@ -51,10 +51,11 @@ In Claude Code:
 
 3. Claude walks the pipeline: decompiles scripts, extracts strings, interviews you to build the game profile (characters, formality rules, what stays untranslated), translates, QAs, and builds a patch you drop into `game/tl/<language>/`.
 
-Two translation paths are supported:
+Claude always asks which translation method you want before starting — pick one of three:
 
-- **Claude in-session** (default, best quality) — Claude translates batch by batch following your game's style guide. No API key needed.
-- **API bulk first-pass** — `translate_api.py` machine-translates everything fast (needs an API key), then Claude reviews and fixes per the QA rules.
+- **In-session** (recommended, best quality and highest throughput) — Claude translates batch by batch following your game's style guide. No API key needed, and it gets the most strings done per 6-hour usage window.
+- **API key** — `translate_api.py` machine-translates everything fast with the Anthropic or Gemini API (needs a key), then Claude reviews and fixes per the QA rules.
+- **Agent** — `translate_api.py` with the headless Claude Code CLI provider; no API key, but each spawned agent's overhead burns the usage window faster, so it finishes fewer strings per window than in-session.
 
 ## Legal note
 

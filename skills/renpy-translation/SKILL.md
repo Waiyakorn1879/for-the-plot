@@ -42,10 +42,15 @@ Every game/language pair gets a **profile**: a `profile.json` (machine config: s
 
 When starting a new game, copy the example's structure, not its content.
 
-## Translation paths
+## Translation method — always ask first
 
-- **Path A — Claude in-session (default, quality path):** load the game's `translation-guide.md` into context, translate in batches of ~20 with speaker labels, write results into the progress JSON, run `qa_check.py --technical-only` after each session. Protocol in `references/translating.md`.
-- **Path B — bulk first-pass:** `scripts/translate_api.py --profile profile.json` machine-translates everything (resumable, token-validated). Providers: `claude-cli` (headless Claude Code, no API key), `anthropic`, or `gemini` — see `references/translating.md`. Always follow with a Claude review pass driven by the QA report.
+**Before starting the Translate phase, always ask the user which method to use. Never assume or silently default.** Present these three options (recommend in-session):
+
+1. **In-session — recommended (best quality *and* throughput).** Claude translates directly in this conversation, in batches of ~20 with speaker labels, following the game's `translation-guide.md`; results go into the progress JSON, then `qa_check.py --technical-only` after each session. No API key, no per-agent overhead — so within a single 6-hour usage window it translates **more** strings than the agent method. Protocol: `references/translating.md` (Path A).
+2. **API key — fast bulk first-pass.** `scripts/translate_api.py --profile profile.json` with provider `anthropic` or `gemini` (needs the matching API key) machine-translates everything (resumable, token-validated). A bulk pass is a draft: always follow with an in-session Claude review driven by the QA report. Details: `references/translating.md` (Path B).
+3. **Agent (claude-cli) — no API key, but lower throughput per usage window.** Same `scripts/translate_api.py` bulk pass with provider `claude-cli`, which spawns headless `claude -p` agents on the user's existing subscription. Works without a key, but each spawned agent re-pays its own context/overhead, so it consumes the 6-hour usage budget faster and translates **fewer** strings per 6-hour window than in-session. Offer it mainly when no API key is available and the user prefers not to translate in-session. Details: `references/translating.md` (Path B).
+
+Confirm the choice, then set `api.provider` in `profile.json` accordingly for methods 2–3.
 
 ## Scripts
 

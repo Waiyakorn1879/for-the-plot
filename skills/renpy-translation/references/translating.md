@@ -1,8 +1,10 @@
 # Phase 4: Translating
 
+**Start by asking the user which method to use** — In-session (Path A), API key, or Agent (both Path B). Never assume; see the "Translation method — always ask first" section in `SKILL.md` for how to present the three options. In-session is recommended (best quality and, per the user's own experience, the highest throughput; the agent/`claude-cli` provider burns the 6-hour usage budget faster and translates fewer strings per window).
+
 Both paths write to the same resumable progress file (`profile.json` → `progress_file`): a flat JSON object `{ "english text": "translation" }`. Keys must match the extracted English **exactly** (same escapes, same tags).
 
-## Path A — Claude in-session (default; quality path)
+## Path A — Claude in-session (recommended; best quality and throughput per usage window)
 
 Protocol per working session:
 
@@ -28,7 +30,7 @@ Pick the provider in the profile (`api.provider`):
 
 | Provider | Needs | Default model | Notes |
 |---|---|---|---|
-| `claude-cli` | Claude Code installed | `sonnet` | **No API key** — headless `claude -p` on the user's existing subscription. Slowest per batch; great default when no key is available. |
+| `claude-cli` (the "agent" method) | Claude Code installed | `sonnet` | **No API key** — headless `claude -p` agents on the user's existing subscription. Each agent re-pays its own context overhead, so it consumes the 6-hour usage budget faster and translates fewer strings per window than in-session. Offer it only when no key is available and the user doesn't want to translate in-session. |
 | `anthropic` | `pip install anthropic`, `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` | Fast, high register quality. |
 | `gemini` | `pip install google-genai`, `GEMINI_API_KEY` | `gemini-2.5-pro` | The original BaDIK pipeline provider. |
 
