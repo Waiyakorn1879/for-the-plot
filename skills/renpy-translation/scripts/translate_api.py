@@ -26,7 +26,9 @@ import sys
 import time
 from pathlib import Path
 
-from translation_memory import TranslationMemory, resolve_tm_path, tm_enabled
+from translation_memory import (
+    TranslationContext, TranslationMemory, resolve_tm_path, tm_enabled,
+)
 
 # Tokens that must be preserved exactly
 VAR_RE = re.compile(r'\[[^\]]+\]')
@@ -284,12 +286,15 @@ def translate_batch(call_model, system, speakers, lang_name, batch, retry=False)
     return result
 
 
-def _print_summary(tm_hits, llm_translations):
+def _print_summary(context_hits, default_hits, llm_translations):
+    tm_hits = context_hits + default_hits
     total = tm_hits + llm_translations
     savings = (tm_hits / total * 100) if total else 0.0
     print("\nTranslation Summary")
     print("-------------------")
     print(f"TM Hits: {tm_hits}")
+    print(f"Context Hits: {context_hits}")
+    print(f"Default Hits: {default_hits}")
     print(f"LLM Calls: {llm_translations}")
     print(f"Savings: {savings:.1f}%")
 
@@ -329,7 +334,8 @@ def main():
     # JSON file. Seed it from existing progress (free bootstrap on first run),
     # then resolve TM hits BEFORE batching so only genuine misses reach the LLM.
     tm = None
-    tm_hits = 0
+    context_hits = 0
+    default_hits = 0
     if tm_enabled(profile):
         tm = TranslationMemory(
             resolve_tm_path(profile, base),
@@ -344,7 +350,9 @@ def main():
         for e in strings:
             if e["text"] in progress:
                 continue
-            hit = tm.lookup(e["text"])
+            ctx = TranslationContext(speaker=e.get("speaker"),
+                                     file=e.get("file"), line=e.get("line"))
+            hit = tm.lookup(e["text"], ctx)
             if hit is None:
                 continue
             tr = hit["translation"]
@@ -352,9 +360,13 @@ def main():
             # different [vars]/{tags}); fall through to the LLM if they differ.
             if token_signature(e["text"]) == token_signature(tr):
                 progress[e["text"]] = tr
-                tm_hits += 1
-        if tm_hits:
-            print(f"TM hits: {tm_hits} (skipped the LLM for these).")
+                if hit["hit_type"] == "context":
+                    context_hits += 1
+                else:
+                    default_hits += 1
+        if context_hits or default_hits:
+            print(f"TM hits: {context_hits + default_hits} "
+                  f"(context {context_hits}, default {default_hits}; skipped the LLM).")
             tm.save()
             # Persist progress now so the early-return-when-done path below still
             # writes translations.json (the file build_patch.py consumes).
@@ -367,11 +379,9 @@ def main():
 
     if not todo:
         print("All strings already translated.")
-        _print_summary(tm_hits, 0)
+        _print_summary(context_hits, default_hits, 0)
         return
 
-    # Map text -> its source entry so TM write-backs can carry context metadata.
-    by_text = {e["text"]: e for e in strings}
     llm_translations = 0
     batch_num = 0
     for i in range(0, len(todo), batch_size):
@@ -418,9 +428,12 @@ def main():
                 accepted += 1
                 llm_translations += 1
                 if tm is not None:
-                    src = by_text.get(item["text"], item)
-                    tm.add(item["text"], tr, speaker=src.get("speaker"),
-                           file=src.get("file"), line=src.get("line"))
+                    # Use the batch item's OWN context (under --no-dedupe many
+                    # items share text but differ by speaker; a text->entry map
+                    # would collapse them to one speaker and mis-tag variants).
+                    ctx = TranslationContext(speaker=item.get("speaker"),
+                                             file=item.get("file"), line=item.get("line"))
+                    tm.add(item["text"], tr, ctx)
         print(f"  Accepted {accepted}/{len(batch)}. Total done: {len(progress)}")
 
         # Save incrementally (progress + TM, atomically, per batch)
@@ -434,7 +447,7 @@ def main():
     if tm is not None:
         tm.save()
     print(f"\nDone. Total translated: {len(progress)}")
-    _print_summary(tm_hits, llm_translations)
+    _print_summary(context_hits, default_hits, llm_translations)
 
 
 if __name__ == "__main__":
