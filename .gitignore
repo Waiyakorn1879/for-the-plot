@@ -8,8 +8,10 @@ __pycache__/
 # Game content must never be committed (copyright)
 *.rpa
 *.rpyc
+translations.json
 *_translations.json
 strings.json
+.ftp/
 decompiled/
 *_sources/
 output/
