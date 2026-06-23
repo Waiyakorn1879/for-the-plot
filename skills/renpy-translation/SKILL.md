@@ -62,7 +62,21 @@ All in `${CLAUDE_PLUGIN_ROOT}/skills/renpy-translation/scripts/`, Python 3.8+, c
 | `translate_api.py` | bulk translation → progress JSON (`--profile`; providers: claude-cli / anthropic / gemini) |
 | `qa_check.py` | technical + declarative register checks (`--profile`, `--technical-only`, `--report`) |
 | `build_patch.py` | progress JSON → patch files (`--profile`, `--translations`, `--strings`, `--out`, `--split-size`) |
+| `translation_memory.py` | Translation Memory cache + tooling (`stats` / `export` / `import` / `clean`, all `--profile`) |
 | `profile_schema.json` | JSON Schema documenting `profile.json` |
+
+## Translation Memory (TM)
+
+A durable source→translation cache at **`.ftp/translation_memory.json`** (project-local by default; set `profile.json` → `tm.path` to a shared file to reuse translations across games). `translate_api.py` consults it **before** every LLM call and writes new translations back, so repeated lines — within a game, and on later game updates — never hit the model twice. It seeds itself from any existing `translations.json` on first run, and prints a savings summary (`TM Hits` / `LLM Calls` / `Savings %`) at the end of a bulk pass.
+
+- Exact + normalized matching (whitespace/CRLF-insensitive, but case- and token-sensitive). Every non-exact hit is re-validated for token preservation against the new source. Fuzzy matching is a v2 feature (`lookup_fuzzy` is a no-op in v1).
+- The engine only ever talks to the `TranslationMemory` class — it never opens the JSON directly.
+- Commands (conceptually `ftp tm <action>`; run as plain scripts here):
+  `python translation_memory.py stats --profile profile.json` ·
+  `… export --profile profile.json --out tm.csv` ·
+  `… import --profile profile.json --in tm.csv` ·
+  `… clean --profile profile.json`
+- Copyright: the TM contains game text — treat it like the progress JSON; never commit or publish it.
 
 ## Hard rules (always apply)
 

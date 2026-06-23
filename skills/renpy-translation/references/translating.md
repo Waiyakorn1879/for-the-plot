@@ -4,6 +4,20 @@
 
 Both paths write to the same resumable progress file (`profile.json` → `progress_file`): a flat JSON object `{ "english text": "translation" }`. Keys must match the extracted English **exactly** (same escapes, same tags).
 
+## Translation Memory (cost + consistency cache)
+
+`translate_api.py` is backed by a **Translation Memory** at `.ftp/translation_memory.json` (override with `profile.json` → `tm.path`; disable with `tm.enabled: false`). Before batching, every string already known to the TM is resolved with **no LLM call** (exact, then whitespace-normalized match — each re-validated for token preservation against the current source); only genuine misses go to the model, and each accepted translation is written back. On first run the TM is seeded from the existing progress file, so a game **update** re-translates only the new lines. The run ends with a summary:
+
+```
+Translation Summary
+-------------------
+TM Hits: 1900
+LLM Calls: 900
+Savings: 67.8%
+```
+
+Inspect/maintain it with `translation_memory.py` (`stats`, `export`/`import` CSV, `clean`) — see `SKILL.md`. The TM contains game text: never commit or publish it. (Fuzzy/similarity matching is planned for v2.)
+
 ## Path A — Claude in-session (recommended; best quality and throughput per usage window)
 
 Protocol per working session:

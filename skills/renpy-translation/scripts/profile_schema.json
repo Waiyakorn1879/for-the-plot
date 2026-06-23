@@ -102,6 +102,21 @@
       "default": false,
       "description": "Switch the game to the target language automatically on first launch (useful when the game has no language picker in Preferences)"
     },
+    "tm": {
+      "type": "object",
+      "description": "Translation Memory: a durable source->translation cache consulted by translate_api.py before calling the LLM, and the CLI translation_memory.py. Managed only via the TranslationMemory class, never edited by hand.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Set false to bypass the TM entirely (every string goes to the LLM)."
+        },
+        "path": {
+          "type": "string",
+          "description": "TM JSON location; relative paths resolve against the profile directory. Default: .ftp/translation_memory.json (project-local). Point at a shared/global file to reuse translations across games (cost win, but a register risk for character dialog)."
+        }
+      }
+    },
     "api": {
       "type": "object",
       "description": "Settings for translate_api.py (bulk first-pass only)",
