@@ -17,7 +17,8 @@ The pipeline was proven on a full Thai translation of *Being a DIK* Episode 1 (2
 - **`renpy-translation` skill** — Claude knows the whole workflow: decompiling `.rpa`/`.rpyc`, extracting dialog, setting up per-character speech registers, translating with full Ren'Py tag safety, running QA, and building a drop-in `game/tl/<language>/` patch.
 - **Pipeline scripts** (cross-platform Python 3.8+, tested in CI):
   - `extract_strings.py` — pulls dialog, menu choices, on-screen text, and (with `--screens`) GUI/`_()` strings out of `.rpy` files
-  - `translate_api.py` — optional bulk first-pass; providers: headless **Claude Code CLI (no API key)**, Anthropic API, or Gemini API (resumable, token-validated)
+  - `translate_api.py` — optional bulk first-pass; providers: headless **Claude Code CLI (no API key)**, Anthropic API, or Gemini API (resumable, token-validated). Consults the Translation Memory before every call so known lines never hit the model twice
+  - `translation_memory.py` — a **Contextual Translation Memory** (TM): a durable source→translation cache that makes repeats and game-update re-runs free. As of v1.3 it stores **speaker-aware variants**, so when the same English line ("You.") needs a different rendering per character, the right one is retrieved deterministically from cache instead of re-translated — zero extra API cost (`stats` / `export` / `import` / `clean`)
   - `qa_check.py` — technical checks (tags/variables/missing) plus declarative, language-specific register rules
   - `build_patch.py` — generates a runtime-filter translation patch plus native `translate strings` blocks for GUI text (no game source modification)
 - **Game profile system** — one `profile.json` + style guide per game/language pair captures speakers, registers, glossary, fonts, and QA rules.
