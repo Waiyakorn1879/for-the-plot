@@ -180,6 +180,13 @@ class TestKindRouting:
         assert '    new "Continuer"' in strings_content
         assert '    old "Pocket Cafe"' in strings_content
 
+    def test_atomic_write_leaves_no_temp_files(self, tmp_path):
+        """A half-written .rpy would be a syntax error in the player's game."""
+        out = self.run_build(tmp_path, with_strings=True)
+        leftovers = [p.name for p in out.iterdir() if p.suffix == ".tmp"]
+        assert leftovers == []
+        assert all(p.suffix == ".rpy" for p in out.iterdir())
+
     def test_nested_quote_string_end_to_end(self, tmp_path):
         profile = {"game_name": "Pocket Cafe", "language_id": "french",
                    "language_name": "French", "progress_file": "tr.json",

@@ -39,13 +39,63 @@
     },
     "speakers": {
       "type": "object",
-      "description": "Speaker code (as it appears in the .rpy scripts) -> character info. Feeds translation context and QA groups.",
+      "description": "Speaker code (as it appears in the .rpy scripts) -> character record. This IS the character dictionary: it feeds the persona card in the translation prompt, the register rules in qa_check.py, and TM context. Only `name` is required — a record with just name/gender/role behaves exactly as it did before v1.4.",
       "additionalProperties": {
         "type": "object",
         "properties": {
           "name": { "type": "string" },
           "gender": { "type": "string", "enum": ["male", "female", "?", ""] },
-          "role": { "type": "string", "description": "One-line description: relationship to protagonist, personality, register hints" }
+          "role": { "type": "string", "description": "One-line description: relationship to protagonist, personality, register hints" },
+          "alias_of": {
+            "type": "string",
+            "description": "This code is the same person as another code — common in visual novels where a character is '???' until introduced. Everything else in this record is ignored; the target's record is used, and the two codes share QA rules."
+          },
+          "register": { "type": "string", "description": "Prose voice guidance: formality, warmth, sentence rhythm, slang tolerance." },
+          "self_pronoun": { "type": "string", "description": "Default first-person pronoun/speech level. Override per relationship in `to`." },
+          "address_pronoun": { "type": "string", "description": "Default second-person pronoun. Override per relationship in `to`." },
+          "forbidden": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Terms this character must NEVER use, in any context. Shown in the prompt AND enforced as a category-2 QA rule, so the gate checks what the prompt asked for."
+          },
+          "must_use": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Vocabulary that should appear in this character's longer lines (verbal tics, signature terms). Advisory — reported as a phrasing flag, never a hard failure."
+          },
+          "speech_notes": { "type": "string", "description": "Hard rules and exceptions that don't fit the other fields." },
+          "monologue": {
+            "type": "object",
+            "description": "Overrides for inner-thought lines wrapped in (...) — a character often addresses themselves differently than anyone else.",
+            "properties": {
+              "self_pronoun": { "type": "string" }
+            }
+          },
+          "to": {
+            "type": "object",
+            "description": "Per-relationship overrides, keyed by the OTHER speaker's code. In register-rich languages the pronoun is a property of the pair, not the person: the same protagonist may use a casual pronoun with a close friend and a formal one with an authority figure. Declared, not auto-detected — these are shown to the translator alongside the scene, because an addressee resolver that guesses wrong is wrong silently and everywhere.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "self_pronoun": { "type": "string" },
+                "address_pronoun": { "type": "string" },
+                "note": { "type": "string" }
+              }
+            }
+          },
+          "examples": {
+            "type": "array",
+            "description": "Approved EN -> target renderings for this character. Two are shown per prompt; a `note` explaining WHY the rendering is right is worth more than a third example.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "en": { "type": "string" },
+                "tr": { "type": "string" },
+                "note": { "type": "string" }
+              },
+              "required": ["en", "tr"]
+            }
+          }
         },
         "required": ["name"]
       }
@@ -57,7 +107,7 @@
     },
     "style_guide_file": {
       "type": "string",
-      "description": "Markdown style guide (registers, formality, slang policy, few-shot examples). Loaded into the system prompt by translate_api.py and into context for in-session translation."
+      "description": "Markdown style guide (registers, formality, slang policy, few-shot examples). Loaded into the system prompt by translate_api.py, and into context by whichever assistant translates in-session."
     },
     "qa_rules_file": {
       "type": "string",
@@ -117,23 +167,97 @@
         }
       }
     },
+    "validation": {
+      "type": "object",
+      "description": "Output validity gates shared by translate_api.py (which refuses to save or cache a failing translation) and qa_check.py (which reports the same failures as category 1). Omit entirely for the defaults.",
+      "properties": {
+        "echo_check": {
+          "type": "boolean",
+          "default": true,
+          "description": "Reject a translation identical to its source. Language-neutral and safe to leave on: sources whose only translatable content is a keep_untranslated term, a variable, a tag, or punctuation are exempt automatically."
+        },
+        "script_check": {
+          "type": "boolean",
+          "default": true,
+          "description": "Reject a translation containing no target-script characters. Effective ONLY when target_script is set explicitly — inferring it from language_id would turn on a new hard failure for existing profiles on upgrade."
+        },
+        "target_script": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "properties": { "ranges": { "type": "array" } } }
+          ],
+          "description": "A named script (thai, lao, khmer, japanese, chinese, korean, cyrillic, greek, arabic, hebrew, devanagari, ...) or explicit codepoint ranges: {\"ranges\": [\"0E00-0E7F\"]}. Setting this is what enables script_check. Latin-script targets cannot be checked this way (they share codepoints with the source)."
+        },
+        "allow_identical": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Exact source strings permitted to pass through unchanged (e.g. a line that is genuinely the same in both languages). Hand-maintained; nothing populates it automatically. Use it for the residue the keep_untranslated exemption doesn't cover."
+        },
+        "min_script_chars": {
+          "type": "integer",
+          "default": 1,
+          "description": "Target-script characters a translation must contain to pass script_check."
+        }
+      }
+    },
     "api": {
       "type": "object",
       "description": "Settings for translate_api.py (bulk first-pass only)",
       "properties": {
         "provider": {
           "type": "string",
-          "enum": ["gemini", "anthropic", "claude-cli"],
+          "enum": ["gemini", "anthropic", "claude-cli", "openai-compatible", "deepseek"],
           "default": "gemini",
-          "description": "claude-cli uses the locally installed Claude Code CLI headlessly — no API key needed"
+          "description": "deepseek is a preset for DeepSeek's official API (base_url, key env, model, and thinking mode pre-set). openai-compatible speaks the same OpenAI Chat Completions wire format for any other endpoint — OpenAI, OpenRouter, Ollama, Azure — selected via base_url. claude-cli drives a locally installed Claude Code CLI headlessly (no API key)."
         },
         "model": {
           "type": "string",
-          "description": "Defaults per provider: gemini → gemini-2.5-pro, anthropic → claude-sonnet-4-6, claude-cli → sonnet"
+          "description": "Defaults per provider: gemini → gemini-2.5-pro, anthropic → claude-sonnet-4-6, claude-cli → sonnet, openai-compatible → gpt-4o-mini, deepseek → deepseek-v4-flash (use deepseek-v4-pro for a harder pass). The legacy aliases deepseek-chat / deepseek-reasoner were retired 2026-07-24; they are still sent if you set them, with a warning."
+        },
+        "thinking": {
+          "type": "boolean",
+          "default": false,
+          "description": "deepseek only. DeepSeek V4 enables thinking mode by default; this preset turns it OFF because reasoning tokens count against max_tokens (a long chain of thought can consume the whole budget and return an EMPTY answer) and because thinking mode rejects temperature, silently discarding the low value this pipeline uses for consistency. Batch translation is not a reasoning task. Set true for a quality-critical pass."
+        },
+        "reasoning_effort": {
+          "type": "string",
+          "enum": ["low", "high", "max"],
+          "default": "high",
+          "description": "deepseek only, and only when thinking is true. deepseek-v4-flash supports all three; deepseek-v4-pro supports high and max."
+        },
+        "escalate_max_tokens": {
+          "type": "boolean",
+          "default": true,
+          "description": "When a reply comes back empty because it hit max_tokens, retry that call once with a 4x budget and keep the raised value for the rest of the run (so discovery is paid once, not per batch). Capped at 65536. Set false to fail immediately instead."
+        },
+        "base_url": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "description": "openai-compatible only. /chat/completions is appended. DeepSeek: https://api.deepseek.com/v1 · OpenRouter: https://openrouter.ai/api/v1 · Ollama: http://localhost:11434/v1 · Azure: https://<resource>.openai.azure.com/openai/deployments/<deployment>"
+        },
+        "api_key_env": {
+          "type": "string",
+          "default": "OPENAI_API_KEY",
+          "description": "openai-compatible only. Name of the environment variable (or .env entry) holding the key. A localhost base_url needs no key."
+        },
+        "api_key_header": {
+          "type": "string",
+          "default": "Authorization",
+          "description": "openai-compatible only. Authorization sends 'Bearer <key>'; set to api-key for Azure, which sends the raw key."
+        },
+        "max_tokens": {
+          "type": "integer",
+          "default": 8192,
+          "description": "Response ceiling for the anthropic and openai-compatible providers."
+        },
+        "json_mode": {
+          "type": "boolean",
+          "default": false,
+          "description": "openai-compatible only. Sends response_format={\"type\":\"json_object\"}. Off by default because support varies across OpenAI-compatible backends; the prompt already specifies the output contract, and object-wrapped replies are unwrapped either way."
         },
         "batch_size": { "type": "integer", "default": 20 },
         "temperature": { "type": "number", "default": 0.3, "description": "Ignored by claude-cli" },
-        "timeout": { "type": "integer", "default": 600, "description": "Per-call timeout in seconds (claude-cli provider)" }
+        "timeout": { "type": "integer", "default": 600, "description": "Per-call timeout in seconds" }
       }
     }
   }

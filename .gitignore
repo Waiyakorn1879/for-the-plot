@@ -20,6 +20,11 @@ output/
 *.ttf
 *.otf
 
+# Private engineering docs — local only, never publish
+/ROADMAP.md
+/ARCHITECTURE.md
+/DECISIONS.md
+
 # Editor noise
 .vscode/
 .idea/

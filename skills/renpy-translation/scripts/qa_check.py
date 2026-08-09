@@ -31,11 +31,15 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
+from characters import missing_must_use, register_rules, resolve_alias
+from validation import (
+    ESC_RE, PCT_RE, TAG_RE, VAR_RE,
+    configure_console, multiset_diff, policy_banner, validate_translation,
+    validation_policy, write_text_atomic,
+)
 
-TAG_RE = re.compile(r"\{[^}]+\}")
-VAR_RE = re.compile(r"\[[^\]]+\]")
+configure_console()
+
 ROMAN_RE = re.compile(r"[a-zA-Z]{4,}")
 
 DEFAULT_WINDOW = 12
@@ -76,26 +80,43 @@ class ContextIndex:
         return sl[max(0, idx - self.window):min(len(sl), idx + self.window + 1)]
 
 
-def rule_speakers(rule, groups):
+def canon(speakers, code):
+    """Canonical speaker code, following `alias_of`.
+
+    Rule matching and group membership run on canonical codes so a character
+    who speaks under several codes ("???" before introduction) is one
+    character everywhere. Without this, a hand-written rule naming the main
+    code silently misses the alias while the generated rule catches it —
+    the same character behaving two ways depending on where the rule came
+    from. Reports still display the RAW code, so a finding stays traceable
+    to the line that produced it.
+    """
+    return resolve_alias(speakers, code)
+
+
+def rule_speakers(rule, groups, speakers=None):
+    speakers = speakers or {}
     if "speakers" in rule:
-        return set(rule["speakers"])
+        return {canon(speakers, c) for c in rule["speakers"]}
     if "speakers_group" in rule:
-        return set(groups.get(rule["speakers_group"], []))
+        return {canon(speakers, c) for c in groups.get(rule["speakers_group"], [])}
     return None  # applies to all speakers
 
 
-def near_condition_met(rule, ctx, groups, s):
+def near_condition_met(rule, ctx, groups, s, speakers=None):
     near = rule.get("near")
     if not near:
         return True
+    speakers = speakers or {}
     window = ctx.get_window(s["file"], s["line"])
-    grp = set(groups.get(near["group"], []))
-    count = sum(1 for w in window if w["speaker"] in grp)
+    win_codes = [canon(speakers, w["speaker"]) for w in window]
+    grp = {canon(speakers, c) for c in groups.get(near["group"], [])}
+    count = sum(1 for c in win_codes if c in grp)
     if count < near.get("min", 1):
         return False
     for other in near.get("dominant_over", []):
-        ogrp = set(groups.get(other, []))
-        ocount = sum(1 for w in window if w["speaker"] in ogrp)
+        ogrp = {canon(speakers, c) for c in groups.get(other, [])}
+        ocount = sum(1 for c in win_codes if c in ogrp)
         if count < ocount:
             return False
     return True
@@ -129,7 +150,13 @@ def main():
             print(f"warning: qa_rules_file not found: {rules_path}")
 
     groups = qa_conf.get("groups", {})
-    rules = qa_conf.get("rules", [])
+    # Character-derived rules first, so a hand-written rule of the same name in
+    # qa_rules.json shadows the generated one rather than duplicating it.
+    speakers = profile.get("speakers", {})
+    generated = register_rules(speakers)
+    authored = qa_conf.get("rules", [])
+    authored_names = {r.get("name") for r in authored}
+    rules = [r for r in generated if r["name"] not in authored_names] + authored
     window = qa_conf.get("window", DEFAULT_WINDOW)
     roman_check = qa_conf.get("roman_check", True)
     trunc_ratio = qa_conf.get("truncation_ratio", DEFAULT_TRUNCATION_RATIO)
@@ -137,15 +164,18 @@ def main():
 
     for rule in rules:
         rule["_re"] = re.compile(rule["pattern"])
-        rule["_speakers"] = rule_speakers(rule, groups)
+        rule["_speakers"] = rule_speakers(rule, groups, speakers)
 
     ctx = ContextIndex(strings, window)
     keep_lower = {k.lower() for k in profile.get("keep_untranslated", [])}
+    policy = validation_policy(profile)
 
     categories = defaultdict(list)  # category label -> issue tuples
 
     for s in strings:
         text, speaker, file, line = s["text"], s["speaker"], s["file"], s["line"]
+        # Match rules on the canonical code; report the raw one.
+        canon_speaker = canon(speakers, speaker)
         tr = trans.get(text)
 
         # ── Category 1: Technical ──────────────────────────────────────────
@@ -153,30 +183,41 @@ def main():
             categories[1].append(("MISSING", speaker, file, line, text, tr or ""))
             continue
 
-        en_tags = set(TAG_RE.findall(text))
-        tr_tags = set(TAG_RE.findall(tr))
-        missing_tags = en_tags - tr_tags
-        if missing_tags:
-            categories[1].append((f"TAG:{','.join(sorted(missing_tags))}", speaker, file, line, text, tr))
+        # Output validity: the same gate translate_api.py refuses to save on,
+        # so a hand-written or pre-1.3.1 translation is held to one standard.
+        ok, code = validate_translation(text, tr, policy)
+        untranslated = not ok
+        if untranslated:
+            categories[1].append((code if code != "ECHO" else "UNTRANSLATED",
+                                  speaker, file, line, text, tr))
 
-        en_vars = set(VAR_RE.findall(text))
-        tr_vars = set(VAR_RE.findall(tr))
-        missing_vars = en_vars - tr_vars
-        if missing_vars:
-            categories[1].append((f"VAR:{','.join(sorted(missing_vars))}", speaker, file, line, text, tr))
+        # Multiset, not set difference: a translation that ADDS or DUPLICATES
+        # a tag is just as broken as one that drops it.
+        for label, rx in (("TAG", TAG_RE), ("VAR", VAR_RE), ("ESC", ESC_RE)):
+            missing, extra = multiset_diff(rx.findall(text), rx.findall(tr))
+            if missing:
+                categories[1].append((f"{label}:{','.join(sorted(missing))}",
+                                      speaker, file, line, text, tr))
+            if extra:
+                categories[1].append((f"{label}+:{','.join(sorted(extra))}",
+                                      speaker, file, line, text, tr))
+
+        en_pct, tr_pct = len(PCT_RE.findall(text)), len(PCT_RE.findall(tr))
+        if en_pct != tr_pct:
+            categories[1].append((f"PCT:{en_pct}->{tr_pct}", speaker, file, line, text, tr))
 
         if args.technical_only:
             continue
 
         # ── Declarative register/phrasing rules ────────────────────────────
         for rule in rules:
-            if rule["_speakers"] is not None and speaker not in rule["_speakers"]:
+            if rule["_speakers"] is not None and canon_speaker not in rule["_speakers"]:
                 continue
             if rule.get("skip_monologue") and is_monologue(text):
                 continue
             if not rule["_re"].search(tr):
                 continue
-            if not near_condition_met(rule, ctx, groups, s):
+            if not near_condition_met(rule, ctx, groups, s, speakers):
                 continue
             cat = rule.get("category", 4)
             if rule.get("dedupe", True):
@@ -187,7 +228,9 @@ def main():
             categories[cat].append((rule["name"], speaker, file, line, text, tr))
 
         # ── Category 4 built-ins: phrasing review flags ────────────────────
-        if roman_check:
+        # An echoed line is 100% Latin by definition; reporting it again as a
+        # cat-4 phrasing flag is noise on top of a cat-1 failure.
+        if roman_check and not untranslated:
             roman_words = ROMAN_RE.findall(tr)
             non_proper = [w for w in roman_words if w.lower() not in keep_lower]
             if non_proper:
@@ -195,6 +238,15 @@ def main():
 
         if len(text) > trunc_min_len and tr and len(tr) < len(text) * trunc_ratio:
             categories[4].append(("short?", speaker, file, line, text, tr))
+
+        # must_use is advisory (category 4), never a hard gate: a character's
+        # signature vocabulary can't be expected on every line, and a short
+        # reply legitimately carries none of it. Only longer lines are checked.
+        if len(text) > trunc_min_len:
+            absent = missing_must_use(speakers, speaker, tr)
+            if absent:
+                categories[4].append((f"must_use?:{','.join(absent[:3])}",
+                                      speaker, file, line, text, tr))
 
     # ── Report ──────────────────────────────────────────────────────────────
     out = io.StringIO()
@@ -222,10 +274,11 @@ def main():
     emit(f"  TRANSLATION QUALITY REPORT — {profile.get('game_name', '?')} → "
          f"{profile.get('language_name', profile.get('language_id', '?'))}")
     emit(f"  Strings: {len(strings)} | Trans loaded: {len(trans)}")
+    emit(f"  {policy_banner(policy)}")
     emit("#" * 72)
 
     section_titles = {
-        1: "CAT 1 — Technical (missing / tag / variable)",
+        1: "CAT 1 — Technical (missing / untranslated / tag / variable / escape)",
         2: "CAT 2 — Register Violations (speaker)",
         3: "CAT 3 — Register Violations (relationship)",
         4: "CAT 4 — Phrasing Flags (manual review)",
@@ -251,7 +304,7 @@ def main():
     emit()
 
     if args.report:
-        Path(args.report).write_text(out.getvalue(), encoding="utf-8")
+        write_text_atomic(Path(args.report), out.getvalue())
         print(f"Report written to {args.report}")
 
     sys.exit(1 if hard else 0)

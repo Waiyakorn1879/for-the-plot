@@ -21,6 +21,10 @@ import re
 import sys
 from pathlib import Path
 
+from validation import configure_console, write_text_atomic
+
+configure_console()
+
 # Match: `speaker "text"` or `speaker "text" (with stuff)` etc.
 # Allows escaped quotes inside.
 SAY_RE = re.compile(
@@ -215,9 +219,7 @@ def main():
         result = list(seen.values())
         print(f"\nTotal: {len(all_entries)} occurrences, {len(result)} unique strings")
 
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
+    write_text_atomic(out, json.dumps(result, ensure_ascii=False, indent=2))
     print(f"Wrote {out}")
 
 

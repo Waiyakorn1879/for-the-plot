@@ -27,15 +27,44 @@ jobs:
         run: |
           python - <<'EOF'
           import json
-          plugin = json.load(open(".claude-plugin/plugin.json"))
-          market = json.load(open(".claude-plugin/marketplace.json"))
+          # Explicit UTF-8 everywhere: these files contain non-ASCII, and a
+          # non-UTF-8 default locale would fail on read (the repo's own rule).
+          load = lambda p: json.load(open(p, encoding="utf-8"))
+          plugin = load(".claude-plugin/plugin.json")
+          market = load(".claude-plugin/marketplace.json")
           assert plugin["name"] == "for-the-plot"
           assert plugin["version"]
           assert market["name"] and market["owner"]["name"]
           assert any(p["name"] == "for-the-plot" for p in market["plugins"])
-          schema = json.load(open("skills/renpy-translation/scripts/profile_schema.json"))
+          # v1.3.0 shipped while the manifest still said 1.2.0; guard the drift.
+          assert plugin["version"] != "1.2.0", "plugin.json version is stale"
+          schema = load("skills/renpy-translation/scripts/profile_schema.json")
           assert schema["properties"]["language_id"]
+          api = schema["properties"]["api"]["properties"]
+          assert {"openai-compatible", "deepseek"} <= set(api["provider"]["enum"])
+          assert {"base_url", "api_key_env", "max_tokens",
+                  "thinking", "reasoning_effort", "escalate_max_tokens"} <= set(api)
+          assert schema["properties"]["validation"]["properties"]["target_script"]
+          # v1.4: speakers IS the character dictionary (ADR-018) — no separate file.
+          speaker = schema["properties"]["speakers"]["additionalProperties"]["properties"]
+          assert {"register", "forbidden", "must_use", "to", "alias_of",
+                  "examples", "monologue"} <= set(speaker)
           print("manifests OK")
+          EOF
+
+      - name: Pipeline phases stay in sync across entry documents
+        run: |
+          python - <<'EOF'
+          # SKILL.md (Claude Code) and PLAYBOOK.md (every other assistant) each
+          # state the pipeline. That is the one deliberate duplication in the
+          # repo, so it is the one place that can silently drift.
+          phases = ["Decompile", "Extract", "Profile", "Translate", "QA", "Patch", "Deploy"]
+          for path in ("skills/renpy-translation/SKILL.md",
+                       "skills/renpy-translation/PLAYBOOK.md"):
+              text = open(path, encoding="utf-8").read()
+              missing = [p for p in phases if p not in text]
+              assert not missing, f"{path} is missing phases: {missing}"
+          print("pipeline phases in sync")
           EOF
 
   # Advisory only: claude plugin validate from a clean npm install.

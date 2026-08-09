@@ -4,7 +4,7 @@
 
 > **You came for the porn. We translated the plot.**
 
-A [Claude Code](https://claude.com/claude-code) plugin for translating Ren'Py visual novels into any language. It packages a complete, battle-tested fan-translation workflow as a skill that Claude follows end to end:
+A complete, battle-tested fan-translation workflow for Ren'Py visual novels, packaged as a [Claude Code](https://claude.com/claude-code) plugin — but written so **any** AI assistant can follow it end to end:
 
 ```
 decompile → extract strings → build a game profile → translate → QA → build patch → deploy
@@ -14,14 +14,17 @@ The pipeline was proven on a full Thai translation of *Being a DIK* Episode 1 (2
 
 ## What you get
 
-- **`renpy-translation` skill** — Claude knows the whole workflow: decompiling `.rpa`/`.rpyc`, extracting dialog, setting up per-character speech registers, translating with full Ren'Py tag safety, running QA, and building a drop-in `game/tl/<language>/` patch.
-- **Pipeline scripts** (cross-platform Python 3.8+, tested in CI):
+- **`renpy-translation` skill** — the whole workflow: decompiling `.rpa`/`.rpyc`, extracting dialog, setting up per-character speech registers, translating with full Ren'Py tag safety, running QA, and building a drop-in `game/tl/<language>/` patch. Claude Code loads it automatically; every other tool reads the same procedure from [`PLAYBOOK.md`](skills/renpy-translation/PLAYBOOK.md).
+- **Pipeline scripts** (cross-platform Python 3.8+, stdlib-only, tested in CI):
+  - `init_project.py` — scaffolds the project folder beside the game: wired-up profile, style-guide skeleton, QA rules, a `.gitignore` that keeps game text out of version control, and `TRANSLATION.md` — the project's own always-loaded instruction file, with `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` stubs pointing at it
   - `extract_strings.py` — pulls dialog, menu choices, on-screen text, and (with `--screens`) GUI/`_()` strings out of `.rpy` files
-  - `translate_api.py` — optional bulk first-pass; providers: headless **Claude Code CLI (no API key)**, Anthropic API, or Gemini API (resumable, token-validated). Consults the Translation Memory before every call so known lines never hit the model twice
+  - `translate_api.py` — optional bulk first-pass. Providers: **`deepseek`** (preset for DeepSeek's official API — just set `DEEPSEEK_API_KEY`), **`openai-compatible`** (OpenAI, OpenRouter, Ollama, Azure — one factory, no SDK), Gemini, Anthropic, or headless **Claude Code CLI (no API key)**. Resumable and token-validated; consults the Translation Memory before every call so known lines never hit the model twice. Empty replies — the classic reasoning-model failure, where thinking tokens eat the whole `max_tokens` budget — are diagnosed with the real cause, retried once at a raised budget, and never saved as a translation
+  - `validation.py` — the shared gate that refuses to save or cache a "translation" that's just the English back again, or that contains none of the target script
   - `translation_memory.py` — a **Contextual Translation Memory** (TM): a durable source→translation cache that makes repeats and game-update re-runs free. As of v1.3 it stores **speaker-aware variants**, so when the same English line ("You.") needs a different rendering per character, the right one is retrieved deterministically from cache instead of re-translated — zero extra API cost (`stats` / `export` / `import` / `clean`)
-  - `qa_check.py` — technical checks (tags/variables/missing) plus declarative, language-specific register rules
+  - `qa_check.py` — technical checks (tags/variables/escapes/`%%`/missing/untranslated) plus declarative, language-specific register rules
   - `build_patch.py` — generates a runtime-filter translation patch plus native `translate strings` blocks for GUI text (no game source modification)
-- **Game profile system** — one `profile.json` + style guide per game/language pair captures speakers, registers, glossary, fonts, and QA rules.
+- **Character records** — `profile.json` → `speakers` is a real character dictionary: register, forbidden/required vocabulary, approved examples, an inner-monologue override, and **per-relationship pronouns** (in register-rich languages the pronoun belongs to the *pair*, not the person — the same protagonist uses one form with a close friend and another with a professor). Each record becomes a persona card in the translation prompt **and** a QA register rule, from one source — so the voice you asked for is the voice that gets checked. Every field is optional.
+- **Game profile system** — one `profile.json` + style guide per game/language pair captures characters, registers, glossary, fonts, validation, and QA rules.
 - **A complete worked example** — the *Being a DIK* → Thai profile, including a 35-character speech-register guide and the lessons learned shipping it.
 
 ## How it works
@@ -43,20 +46,32 @@ In Claude Code:
 /plugin install for-the-plot@for-the-plot
 ```
 
+**Using another tool?** Clone the repo and point your assistant at [`AGENTS.md`](AGENTS.md) (or [`skills/renpy-translation/PLAYBOOK.md`](skills/renpy-translation/PLAYBOOK.md) directly). The scripts are plain Python with no required dependencies and run from any shell.
+
 ## Quickstart
 
-1. Make a working folder next to (not inside) your game install.
-2. Open Claude Code there and say something like:
+1. Scaffold a project next to (not inside) your game install:
+
+   ```
+   python skills/renpy-translation/scripts/init_project.py \
+       --game "D:/Games/SomeGame-1.0-pc" --language french --dir SomeGame-French
+   ```
+
+2. Open your assistant in that folder and say something like:
 
    > Help me translate this Ren'Py game into French. The game is at D:\Games\SomeGame-1.0-pc
 
-3. Claude walks the pipeline: decompiles scripts, extracts strings, interviews you to build the game profile (characters, formality rules, what stays untranslated), translates, QAs, and builds a patch you drop into `game/tl/<language>/`.
+3. It walks the pipeline: decompiles scripts, extracts strings, interviews you to build the game profile (characters, formality rules, what stays untranslated), translates, QAs, and builds a patch you drop into `game/tl/<language>/`.
 
-Claude always asks which translation method you want before starting — pick one of three:
+You're always asked which translation method you want before starting — pick one of three:
 
-- **In-session** (recommended, best quality and highest throughput) — Claude translates batch by batch following your game's style guide. No API key needed, and it gets the most strings done per 6-hour usage window.
-- **API key** — `translate_api.py` machine-translates everything fast with the Anthropic or Gemini API (needs a key), then Claude reviews and fixes per the QA rules.
-- **Agent** — `translate_api.py` with the headless Claude Code CLI provider; no API key, but each spawned agent's overhead burns the usage window faster, so it finishes fewer strings per window than in-session.
+- **In-session** (recommended, best quality and highest throughput) — the assistant translates batch by batch following your game's style guide. No API key needed, and the style guide is loaded once per session instead of re-sent per batch.
+- **API key** — `translate_api.py` machine-translates everything fast via DeepSeek, OpenAI, OpenRouter, a local Ollama, Azure, Gemini, or Anthropic, then the assistant reviews and fixes per the QA rules.
+- **Agent** — `translate_api.py` with the headless Claude Code CLI provider; no API key, but each spawned agent re-pays its own context overhead, so it finishes fewer strings per unit of quota than in-session.
+
+## Not just Ren'Py, not just Claude
+
+Ren'Py is the primary target and the only shipped engine adapter — but only `extract_strings.py`, `build_patch.py`, and four reference docs actually know what Ren'Py is. The profile system, progress store, Translation Memory, QA engine, and token-parity rules are engine-neutral. [`references/engine-seam.md`](skills/renpy-translation/references/engine-seam.md) specifies the two file contracts at that boundary, so supporting another engine means writing two programs and changing nothing else.
 
 ## Legal note
 

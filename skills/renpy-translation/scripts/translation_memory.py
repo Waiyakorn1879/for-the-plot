@@ -45,13 +45,13 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import re
 import sys
-import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+from validation import write_text_atomic
 
 VERSION = 2
 
@@ -224,19 +224,8 @@ class TranslationMemory:
     def save(self):
         """Atomic write (temp file in the same dir + os.replace) so an
         interrupted run can never leave a half-written or empty TM."""
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
-        fd, tmp = tempfile.mkstemp(dir=str(self.path.parent), suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(payload)
-            os.replace(tmp, self.path)
-        except BaseException:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
-            raise
+        write_text_atomic(self.path,
+                          json.dumps(self.to_dict(), ensure_ascii=False, indent=2))
 
     # ---- lookup / add ---------------------------------------------------
 

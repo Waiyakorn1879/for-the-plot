@@ -18,7 +18,12 @@ Usage:
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
+
+from validation import configure_console, write_text_atomic
+
+configure_console()
 
 
 def load_profile(path):
@@ -336,19 +341,21 @@ def main():
     dict_translations = {k: v for k, v in translations.items()
                          if k not in strings_translations}
 
+    # Atomic: an interrupted build must not leave a truncated .rpy, which
+    # would be a syntax error inside the player's game folder.
     filter_path = out_dir / f"00_{ident}_filter.rpy"
-    filter_path.write_text(build_filter_rpy(profile), encoding="utf-8")
+    write_text_atomic(filter_path, build_filter_rpy(profile))
     print(f"Wrote {filter_path}")
 
     for fi, content in build_dict_rpy(dict_translations, ident, lang_name, args.split_size):
         dict_path = out_dir / f"{fi + 1:02d}_{ident}_dict.rpy"
-        dict_path.write_text(content, encoding="utf-8")
+        write_text_atomic(dict_path, content)
         print(f"Wrote {dict_path}")
 
     if strings_translations:
         strings_out = out_dir / f"02_{ident}_strings.rpy"
-        strings_out.write_text(
-            build_strings_rpy(strings_translations, lang, lang_name), encoding="utf-8")
+        write_text_atomic(strings_out,
+                          build_strings_rpy(strings_translations, lang, lang_name))
         print(f"Wrote {strings_out} ({len(strings_translations)} screen/UI strings)")
 
     print(f"\nDeploy: copy {out_dir} into the game's game/tl/ folder "

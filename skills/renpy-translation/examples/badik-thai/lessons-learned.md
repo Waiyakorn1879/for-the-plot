@@ -38,3 +38,36 @@ Also intentionally out of scope, and worth agreeing upfront for any game: GUI/me
 - Keep the progress JSON as the single source of truth; every other artifact (patch files, QA reports) regenerates from it.
 - Resumability paid off constantly — API failures, interrupted sessions, re-translation of weak batches all just re-ran.
 - When the user corrects a pattern ("MC must use ผม with all female characters he just met"), encode it as a QA rule immediately; corrections that live only in conversation get re-violated by the next batch.
+
+## What v1.4 changes about this example
+
+The pronoun matrix in `pronoun-reference.md` was written and maintained **by
+hand**, and it is the single most valuable artifact in this project — but
+nothing could read it. Prose can't be injected into a prompt or checked by a
+tool, so every pronoun rule had to be re-stated as a QA regex and re-explained
+to the translator in every session.
+
+The machine-readable half of that knowledge now lives in `profile.json` →
+`speakers`, and `mc` / `my` / `sa` / `isa` here are filled in as a worked
+example of the shape:
+
+- **`to` maps are the point.** `mc` declares เรา/แก for Sage, Maya and Josy but
+  ผม/คุณ for Isabella, Jill and Cathy. That is exactly what
+  `pronoun-reference.md` says in prose — but now the translation prompt shows
+  it automatically for whichever characters appear in the batch.
+- **`forbidden` replaces a QA rule.** Maya's "ไม่ใช้ กู/มึง เด็ดขาด" was a
+  hand-written pattern; it is now a field on her record that produces the QA
+  rule *and* the `NEVER use` line in her persona card, from one source.
+- **`monologue.self_pronoun`** captures "inner monologue always uses กู",
+  which previously survived only as a paragraph in `character-profiles.md`.
+
+Keep `character-profiles.md` and `pronoun-reference.md`: they hold the
+*reasoning*, the English speech patterns, and the cases that don't reduce to
+fields. The record is the enforceable subset, not a replacement.
+
+Note the remaining overlap in `qa_rules.json`: the blanket `กู ← female` and
+`มึง ← female` rules predate character records and now double-report for Maya
+and Isabella, who declare those terms forbidden individually. On a new project,
+prefer per-character `forbidden` for speaker-identity rules and keep
+`qa_rules.json` for **context**-dependent ones (`near`), which records can't
+express.
