@@ -25,6 +25,10 @@ output/
 /ARCHITECTURE.md
 /DECISIONS.md
 
+# Reference material from other translation projects: process docs that
+# describe someone else's work. Read locally, never published from here.
+/Ref/
+
 # Editor noise
 .vscode/
 .idea/
