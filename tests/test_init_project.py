@@ -120,3 +120,22 @@ class TestScaffoldFeedsThePipeline:
             capture_output=True, text=True, encoding="utf-8")
         assert proc.returncode == 0, proc.stdout
         assert "script=on" in proc.stdout
+
+
+class TestRelationshipScaffold:
+    def test_block_is_present_but_inert(self, tmp_path):
+        """Scaffolded so it is discoverable, empty so it changes nothing:
+        a fresh project resolves no addressees until someone declares one."""
+        import sys as _sys
+        _sys.path.insert(0, str(SCRIPTS_DIR))
+        from relationships import relationships_config
+
+        _, project = run_init(tmp_path)
+        profile = json.loads((project / "profile.json").read_text(encoding="utf-8"))
+        assert profile["relationships"] == {"declared": []}
+        assert relationships_config(profile)["enabled"] is False
+
+    def test_runbook_mentions_the_report(self, tmp_path):
+        _, project = run_init(tmp_path)
+        text = (project / "TRANSLATION.md").read_text(encoding="utf-8")
+        assert "relationships.py --profile profile.json" in text

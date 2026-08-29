@@ -31,7 +31,10 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from characters import missing_must_use, register_rules, resolve_alias
+from characters import (
+    is_monologue, missing_must_use, register_rules, resolve_alias,
+)
+from relationships import build_resolver
 from validation import (
     ESC_RE, PCT_RE, TAG_RE, VAR_RE,
     configure_console, multiset_diff, policy_banner, validate_translation,
@@ -51,10 +54,6 @@ def load_profile(path):
     profile_path = Path(path)
     profile = json.loads(profile_path.read_text(encoding="utf-8"))
     return profile, profile_path.parent
-
-
-def is_monologue(text):
-    return text.startswith("(") and text.endswith(")")
 
 
 class ContextIndex:
@@ -92,6 +91,24 @@ def canon(speakers, code):
     to the line that produced it.
     """
     return resolve_alias(speakers, code)
+
+
+def rule_targets(rule, groups, speakers=None):
+    """Canonical addressee codes a rule is restricted to, or None for any.
+
+    A rule with `to`/`to_group` only fires on lines whose addressee was
+    resolved at or above the profile's min_confidence — an unresolved line is
+    not evidence that the rule does or does not apply, so it is skipped.
+    """
+    speakers = speakers or {}
+    if "to" in rule:
+        codes = rule["to"]
+        if isinstance(codes, str):
+            codes = [codes]
+        return {canon(speakers, c) for c in codes}
+    if "to_group" in rule:
+        return {canon(speakers, c) for c in groups.get(rule["to_group"], [])}
+    return None
 
 
 def rule_speakers(rule, groups, speakers=None):
@@ -165,6 +182,13 @@ def main():
     for rule in rules:
         rule["_re"] = re.compile(rule["pattern"])
         rule["_speakers"] = rule_speakers(rule, groups, speakers)
+        rule["_to"] = rule_targets(rule, groups, speakers)
+
+    # Addressee resolution (v1.5). Built from the same profile block and the
+    # same gate the translation prompt uses, so a relationship rule checks the
+    # pairing the translator was actually told to write.
+    resolver = build_resolver(profile, strings)
+    targets = [resolver.target_for(s) for s in strings] if resolver.enabled         else [None] * len(strings)
 
     ctx = ContextIndex(strings, window)
     keep_lower = {k.lower() for k in profile.get("keep_untranslated", [])}
@@ -172,10 +196,14 @@ def main():
 
     categories = defaultdict(list)  # category label -> issue tuples
 
-    for s in strings:
+    for idx, s in enumerate(strings):
         text, speaker, file, line = s["text"], s["speaker"], s["file"], s["line"]
         # Match rules on the canonical code; report the raw one.
         canon_speaker = canon(speakers, speaker)
+        target = targets[idx]
+        # Findings name the pair when one was resolved, so a category-3 hit is
+        # traceable to the relationship it was judged against.
+        speaker = f"{speaker}→{target}" if target else speaker
         tr = trans.get(text)
 
         # ── Category 1: Technical ──────────────────────────────────────────
@@ -213,6 +241,8 @@ def main():
         for rule in rules:
             if rule["_speakers"] is not None and canon_speaker not in rule["_speakers"]:
                 continue
+            if rule["_to"] is not None and (target is None or target not in rule["_to"]):
+                continue
             if rule.get("skip_monologue") and is_monologue(text):
                 continue
             if not rule["_re"].search(tr):
@@ -243,7 +273,7 @@ def main():
         # signature vocabulary can't be expected on every line, and a short
         # reply legitimately carries none of it. Only longer lines are checked.
         if len(text) > trunc_min_len:
-            absent = missing_must_use(speakers, speaker, tr)
+            absent = missing_must_use(speakers, canon_speaker, tr)
             if absent:
                 categories[4].append((f"must_use?:{','.join(absent[:3])}",
                                       speaker, file, line, text, tr))
@@ -275,6 +305,14 @@ def main():
          f"{profile.get('language_name', profile.get('language_id', '?'))}")
     emit(f"  Strings: {len(strings)} | Trans loaded: {len(trans)}")
     emit(f"  {policy_banner(policy)}")
+    # Only when relationships are in use: a profile that declares none gets the
+    # v1.4 report unchanged, down to the byte.
+    if resolver.enabled:
+        emit(f"  Addressee: {sum(1 for t in targets if t)}/{len(strings)} resolved "
+             f"(min_confidence={resolver.min_confidence})")
+        if resolver.unknown_speakers:
+            emit(f"  {len(resolver.unknown_speakers)} speaker code(s) have no "
+                 f"character record — run relationships.py to list them.")
     emit("#" * 72)
 
     section_titles = {

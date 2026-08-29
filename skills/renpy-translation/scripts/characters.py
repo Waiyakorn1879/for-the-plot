@@ -19,6 +19,7 @@ Record shape (all optional except `name`):
 
     "my": {
       "name": "Maya", "gender": "female", "role": "childhood best friend",
+      "called": ["May"],                   # how the script addresses her
       "register": "casual, warm, teasing",
       "self_pronoun": "ฉัน", "address_pronoun": "เธอ",
       "forbidden": ["กู", "มึง"],          # never, in any context
@@ -28,22 +29,36 @@ Record shape (all optional except `name`):
       "monologue": {"self_pronoun": "..."},   # inner-thought override
       "to": {                                  # per-relationship overrides
         "mc": {"self_pronoun": "ฉัน", "address_pronoun": "นาย",
+               "forbidden": [],            # never TO this person specifically
                "note": "close but never crude"}
       }
     }
 
 `to` exists because in register-rich languages pronouns are a property of the
 *pair*, not the person: in the shipped worked example the protagonist uses
-เรา/แก with one friend and ผม with a formal acquaintance. Relationships are
-declared and shown to the translator alongside the scene, rather than resolved
-automatically — an addressee resolver that guesses wrong is worse than one
-that doesn't exist, because it is wrong silently and everywhere.
+เรา/แก with one friend and ผม with a formal acquaintance.
+
+Which relationship applies to a given line is answered by `relationships.py`,
+which resolves the addressee only from evidence it can name and reports
+everything else as unresolved (ADR-020). This module stays the authority on
+what a pairing *means*; it never decides which pairing a line uses.
 """
 
 # Pseudo-speakers the extractor emits for non-character text.
 PSEUDO_SPEAKERS = {"_text", "_menu", "_screen", "_ui", "narrator"}
 
 MAX_ALIAS_DEPTH = 10
+
+
+def is_monologue(text):
+    """Inner thought, by the Ren'Py convention of wrapping the line in (...).
+
+    Lives here rather than in either consumer because three of them now ask
+    the question — the `monologue` pronoun override, QA's `skip_monologue`
+    rule flag, and addressee resolution (a thought has no addressee). Two
+    copies of this predicate would eventually disagree about what a thought is.
+    """
+    return text.startswith("(") and text.endswith(")")
 
 
 def resolve_alias(speakers, code, _depth=0):
@@ -138,6 +153,10 @@ def persona_card(speakers, code, max_examples=2):
             bits.append(f"self {rel['self_pronoun']}")
         if rel.get("address_pronoun"):
             bits.append(f"calls them {rel['address_pronoun']}")
+        # The same list qa_check.py turns into a category-3 rule — the prompt
+        # must ask for exactly what the gate checks.
+        if rel.get("forbidden"):
+            bits.append(f"NEVER {', '.join(rel['forbidden'])}")
         if rel.get("note"):
             bits.append(rel["note"])
         if bits:
@@ -187,31 +206,58 @@ def register_rules(speakers):
     """Character records -> qa_check rules, so the gate checks what the
     prompt asked for.
 
-    `forbidden` becomes a category-2 rule (speaker identity). Terms are
-    matched literally and reported, never suppressed: in an unspaced script
-    a clever exclusion pattern hides real violations far more often than it
-    removes noise (see references/qa.md).
+    `forbidden` becomes a category-2 rule (speaker identity), and a
+    per-relationship `to[other].forbidden` becomes a category-3 rule (speaker
+    *and* addressee) that only fires on lines where the addressee was resolved
+    confidently. Terms are matched literally and reported, never suppressed: in
+    an unspaced script a clever exclusion pattern hides real violations far
+    more often than it removes noise (see references/qa.md).
+
+    `to[other].forbidden` is a field that did not exist before v1.5, which is
+    deliberate: category 3 is a hard failure, so generating rules from any
+    field an existing profile already populates would turn a working v1.4
+    project red on upgrade.
     """
     import re
+
+    def pattern(terms):
+        return "|".join(re.escape(t) for t in terms)
 
     rules = []
     for code, record in sorted(speakers.items()):
         if not isinstance(record, dict) or record.get("alias_of"):
             continue
-        forbidden = [t for t in (record.get("forbidden") or []) if t]
-        if not forbidden:
-            continue
         codes = sorted({code} | {
             other for other, rec in speakers.items()
             if isinstance(rec, dict) and rec.get("alias_of") == code})
         name = record.get("name", code)
-        rules.append({
-            "name": f"{name}: forbidden term",
-            "category": 2,
-            "speakers": codes,
-            "pattern": "|".join(re.escape(t) for t in forbidden),
-            "_from_character": True,
-        })
+
+        forbidden = [t for t in (record.get("forbidden") or []) if t]
+        if forbidden:
+            rules.append({
+                "name": f"{name}: forbidden term",
+                "category": 2,
+                "speakers": codes,
+                "pattern": pattern(forbidden),
+                "_from_character": True,
+            })
+
+        for target_code, rel in sorted((record.get("to") or {}).items()):
+            if not isinstance(rel, dict):
+                continue
+            rel_forbidden = [t for t in (rel.get("forbidden") or []) if t]
+            if not rel_forbidden:
+                continue
+            canonical = resolve_alias(speakers, target_code)
+            rules.append({
+                "name": f"{name} to {display_name(speakers, target_code)}: "
+                        f"forbidden term",
+                "category": 3,
+                "speakers": codes,
+                "to": [canonical],
+                "pattern": pattern(rel_forbidden),
+                "_from_character": True,
+            })
     return rules
 
 

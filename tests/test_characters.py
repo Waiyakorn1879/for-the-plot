@@ -162,3 +162,85 @@ class TestRelationship:
 
     def test_undeclared_pair_is_empty(self):
         assert relationship(SPEAKERS, "mc", "sa") == {}
+
+
+class TestRelationshipForbiddenRules:
+    """v1.5: `to[other].forbidden` -> a category-3 rule.
+
+    Generated from a field that did not exist in v1.4 on purpose — category 3
+    is a hard failure, so a rule derived from data existing profiles already
+    carry would fail them on upgrade.
+    """
+
+    SPEAKERS = {
+        "mc": {"name": "Ethan",
+               "forbidden": ["X"],
+               "to": {"prof": {"address_pronoun": "formal", "forbidden": ["Y"]},
+                      "amy": {"note": "close"}}},
+        "prof": {"name": "Sandra"},
+        "amy": {"name": "Amy"},
+        "mc_q": {"name": "???", "alias_of": "mc"},
+    }
+
+    def rules(self):
+        return characters.register_rules(self.SPEAKERS)
+
+    def test_relationship_rule_is_generated(self):
+        rule = next(r for r in self.rules() if r["category"] == 3)
+        assert rule["name"] == "Ethan to Sandra: forbidden term"
+        assert rule["pattern"] == "Y"
+        assert rule["to"] == ["prof"]
+
+    def test_it_carries_the_speaker_and_their_aliases(self):
+        rule = next(r for r in self.rules() if r["category"] == 3)
+        assert rule["speakers"] == ["mc", "mc_q"]
+
+    def test_the_speaker_level_rule_is_untouched(self):
+        rule = next(r for r in self.rules() if r["category"] == 2)
+        assert (rule["pattern"], rule.get("to")) == ("X", None)
+
+    def test_a_relationship_without_forbidden_generates_nothing(self):
+        names = [r["name"] for r in self.rules()]
+        assert not any("Amy" in n for n in names)
+
+    def test_a_v14_to_map_generates_no_rules(self):
+        speakers = {"mc": {"name": "Ethan", "to": {"prof": {"self_pronoun": "p"}}},
+                    "prof": {"name": "Sandra"}}
+        assert characters.register_rules(speakers) == []
+
+    def test_addressee_codes_are_canonical(self):
+        speakers = {"mc": {"name": "Ethan", "to": {"p_q": {"forbidden": ["Y"]}}},
+                    "prof": {"name": "Sandra"},
+                    "p_q": {"name": "???", "alias_of": "prof"}}
+        rule = characters.register_rules(speakers)[0]
+        assert rule["to"] == ["prof"]
+
+    def test_malformed_relationship_entries_are_skipped(self):
+        speakers = {"mc": {"name": "Ethan", "to": {"prof": "not a dict"}}}
+        assert characters.register_rules(speakers) == []
+
+
+class TestIsMonologue:
+    """One definition, three consumers (prompt override, QA, resolver)."""
+
+    def test_parenthesized_line(self):
+        assert characters.is_monologue("(She looks tired.)")
+
+    def test_plain_line(self):
+        assert not characters.is_monologue("She looks tired.")
+
+    def test_partial_parens(self):
+        assert not characters.is_monologue("(Ugh) she said")
+        assert not characters.is_monologue("")
+
+
+class TestRelationshipForbiddenInPersonaCard:
+    def test_the_prompt_asks_for_what_the_gate_checks(self):
+        speakers = {"mc": {"name": "Ethan", "register": "casual",
+                           "to": {"prof": {"address_pronoun": "formal",
+                                           "forbidden": ["Y", "Z"]}}},
+                    "prof": {"name": "Sandra"}}
+        card = persona_card(speakers, "mc")
+        assert "to Sandra: calls them formal; NEVER Y, Z" in card
+        rule = next(r for r in register_rules(speakers) if r["category"] == 3)
+        assert rule["pattern"] == "Y|Z"

@@ -44,11 +44,15 @@ python scripts/init_project.py --game "<game install>" --language <id>
 
 It scaffolds the project beside the game — profile, style-guide skeleton, QA rules, a `.gitignore` that keeps game text out of version control, and **`TRANSLATION.md`**, the project's own always-loaded instruction file, with `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` stubs pointing at it. That file is the point: a translation runs for hundreds of batches across many sessions, and a convention discovered at string 1,400 gets re-broken by string 1,450 unless it lives somewhere loaded every time.
 
-## §2b Character records [PORTABLE] structure, [RE-DERIVE] cast
+## §2b Character records and relationships [PORTABLE] structure, [RE-DERIVE] cast
 
 `profile.json` → `speakers` is the character dictionary. A record can carry `register`, default and **per-relationship** pronouns (`to`), `forbidden`, `must_use`, an inner-monologue override, and approved `examples`. It feeds the translation prompt as a persona card *and* `qa_check.py` as register rules, from one source — so the voice asked for is the voice checked.
 
-Per-relationship pronouns are the high-value field in register-rich languages: the pronoun belongs to the pair, not the person. Relationships are declared rather than inferred, and shown to the translator alongside the scene — an addressee resolver that guesses wrong is wrong silently and everywhere.
+Per-relationship pronouns are the high-value field in register-rich languages: the pronoun belongs to the pair, not the person.
+
+Which pair applies to a given line is answered by `python scripts/relationships.py --profile profile.json` — from a scope you declared, a name addressed in vocative position in the source line, or a scene unit containing exactly two character speakers. Everything else is reported **unresolved, with a reason**, and behaves as it did before: the whole relationship table goes to the translator, who applies it. That refusal is the design, not a gap — a wrong addressee produces a wrong pronoun on a line that looks fine, so it is wrong silently and everywhere. There is deliberately no "who spoke nearby" tier.
+
+Run the report before batch 1. Its most useful column is the pairs that resolve but have **no declared register yet** — that is the to-do list for the profile. It also lists speaker codes with no character record, which otherwise silently get the generic voice.
 
 ## §3 Execution modes [PORTABLE]
 
@@ -76,7 +80,8 @@ The core loop, in full, is `references/translating.md` Path A. The short form:
 1. Load translation-guide.md into context.
 2. Take the next 40-60 untranslated strings from strings.json,
    contiguous by file+line so scene context is visible.
-3. For each: who speaks, to whom, what kind of line.
+3. For each: who speaks, to whom (relationships.py answers this where it can;
+   where it doesn't, read the surrounding lines), what kind of line.
 4. Read-modify-write the progress JSON. Never truncate it.
 5. python qa_check.py --profile profile.json --technical-only  -> zero cat-1.
 6. Repeat. Report progress briefly; don't stop for approval each batch.
@@ -112,6 +117,7 @@ Two file contracts separate the engine adapter from everything else — what any
 Full detail in `references/qa.md`. The parts that generalize:
 
 - **Four categories.** 1: technical (missing, untranslated, token damage) — must be zero before a build. 2–3: register violations by speaker and by relationship. 4: phrasing flags for human review.
+- **A relationship rule only fires on a resolved pairing.** Category-3 rules restricted by addressee (`to`/`to_group`, or generated from `to[other].forbidden`) skip every line whose addressee is unknown. A gate that guessed the pairing would flag correct text, and people stop reading a report that cries wolf.
 - **Scanners report, they never mutate.** A tool that silently rewrites translations destroys the audit trail. AI proposes; a human commits.
 - **Tune scanners toward noise, never toward silence.** In an unspaced script, suppressing a false positive can erase a real violation. A false positive costs a glance; a false negative ships.
 - **The backward-audit rule.** Every newly-discovered convention triggers an audit of everything already translated: discover → write it into the guide *in the same turn* → scan → fix → re-verify. Budget for 5–15 of these over a full game.
@@ -129,5 +135,6 @@ Full detail in `references/qa.md`. The parts that generalize:
 | One rendering per source line (runtime filter) | `SKILL.md`, `references/native-translate-blocks.md` |
 | Text built dynamically in Python is invisible to the extractor | `references/custom-subsystems.md` |
 | Line references drift when the game is re-decompiled | `references/decompiling.md` |
+| A pre-v1.5 `strings.json` has no scene labels, so addressee resolution loses a tier until you re-extract | `references/extraction.md` |
 | Untranslated output used to pass silently — now a hard failure | `references/qa.md` |
 | Reasoning models can burn the whole `max_tokens` budget on thinking and return an empty answer | `references/translating.md` |

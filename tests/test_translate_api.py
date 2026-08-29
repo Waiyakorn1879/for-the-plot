@@ -502,3 +502,149 @@ class TestAliasSharesTranslationMemory:
         assert calls == [], "alias line should have been served from the TM"
         progress = _json.loads((tmp_path / "tr.json").read_text(encoding="utf-8"))
         assert progress == {"Hey.": "หวัดดี"}
+
+
+class TestAddresseeInPrompt:
+    """v1.5: a resolved addressee rides on the line; an unresolved one does
+    not appear at all. The cast block keeps the whole relationship table, so
+    an unresolved line reads exactly as it did in v1.4."""
+
+    SPEAKERS = {
+        "mc": {"name": "MC", "register": "blunt",
+               "to": {"my": {"address_pronoun": "kimi"}}},
+        "my": {"name": "Maya"},
+        "prof": {"name": "Prof"},
+    }
+
+    def _batch(self, speakers_of_lines, label="scene1"):
+        # label_cast is what the extractor states pre-dedupe; the resolver
+        # refuses to infer it from who happens to still be in the corpus.
+        cast = sorted(set(speakers_of_lines))
+        return [{"id": i, "text": f"Line {i}.", "speaker": code, "kind": "say",
+                 "file": "a.rpy", "line": i, "label": label, "label_cast": cast}
+                for i, code in enumerate(speakers_of_lines)]
+
+    def _prompt(self, batch, resolver):
+        seen = {}
+        def fake(system, user):
+            seen["user"] = user
+            return "[]"
+        translate_api.translate_batch(fake, "SYSTEM", self.SPEAKERS, "Thai",
+                                      batch, resolver=resolver)
+        return seen["user"]
+
+    def _resolver(self, batch, profile_extra=None):
+        from relationships import build_resolver
+        profile = {"speakers": self.SPEAKERS, **(profile_extra or {})}
+        return build_resolver(profile, batch)
+
+    def test_resolved_lines_name_the_addressee(self):
+        batch = self._batch(["mc", "my"])
+        user = self._prompt(batch, self._resolver(batch))
+        assert '"speaker": "MC", "to": "Maya", "kind": "say"' in user
+        assert '"speaker": "Maya", "to": "MC", "kind": "say"' in user
+
+    def test_unresolved_lines_carry_no_to_field(self):
+        batch = self._batch(["mc", "my", "prof"])     # three-party label
+        user = self._prompt(batch, self._resolver(batch))
+        assert '"to":' not in user
+
+    def test_relationship_table_still_travels_with_the_cast(self):
+        batch = self._batch(["mc", "my", "prof"])
+        user = self._prompt(batch, self._resolver(batch))
+        assert "to Maya: calls them kimi" in user
+
+    def test_no_resolver_is_the_v14_prompt(self):
+        batch = self._batch(["mc", "my"])
+        seen = {}
+        def fake(system, user):
+            seen["user"] = user
+            return "[]"
+        translate_api.translate_batch(fake, "SYSTEM", self.SPEAKERS, "Thai", batch)
+        assert '"to":' not in seen["user"]
+
+    def test_a_disabled_resolver_reproduces_that_prompt_byte_for_byte(self):
+        batch = self._batch(["mc", "my"])
+        off = self._prompt(batch, self._resolver(
+            batch, {"relationships": {"enabled": False}}))
+        seen = {}
+        def fake(system, user):
+            seen["user"] = user
+            return "[]"
+        translate_api.translate_batch(fake, "SYSTEM", self.SPEAKERS, "Thai", batch)
+        assert off == seen["user"]
+
+
+class TestAddresseeRuleInSystemPrompt:
+    def _system(self, profile, tmp_path):
+        return translate_api.build_system_instruction(profile, tmp_path)
+
+    def test_absent_for_a_profile_without_relationships(self, tmp_path):
+        system = self._system({"game_name": "G", "language_name": "Thai",
+                               "speakers": {"a": {"name": "A"}}}, tmp_path)
+        assert "ADDRESSEE:" not in system
+
+    def test_present_once_relationships_are_declared(self, tmp_path):
+        system = self._system({"game_name": "G", "language_name": "Thai",
+                               "speakers": {"a": {"name": "A", "to": {"b": {}}}}},
+                              tmp_path)
+        assert "ADDRESSEE:" in system
+        assert 'When "to" is absent' in system
+
+    def test_it_is_the_only_difference(self, tmp_path):
+        base = {"game_name": "G", "language_name": "Thai",
+                "speakers": {"a": {"name": "A"}}}
+        off = self._system(base, tmp_path)
+        on = self._system({**base, "relationships": {"enabled": True}}, tmp_path)
+        assert on.replace(translate_api.ADDRESSEE_RULE + "\n", "") == off
+
+
+class TestAddresseeReachesTheMemory:
+    """The reserved `target` slot (ADR-006) starts being filled."""
+
+    STRINGS = [
+        {"text": "You.", "speaker": "mc", "file": "a.rpy", "line": 1,
+         "kind": "say", "label": "scene1", "label_cast": ["mc", "my"]},
+        {"text": "Right.", "speaker": "my", "file": "a.rpy", "line": 2,
+         "kind": "say", "label": "scene1", "label_cast": ["mc", "my"]},
+    ]
+    PROFILE = {
+        "game_name": "T", "language_id": "thai", "language_name": "Thai",
+        "strings_file": "strings.json", "progress_file": "tr.json",
+        "speakers": {"mc": {"name": "MC", "to": {"my": {"address_pronoun": "k"}}},
+                     "my": {"name": "Maya"}},
+        "validation": {"target_script": "thai"},
+        "api": {"provider": "stub", "batch_size": 10},
+    }
+
+    def _run(self, tmp_path, monkeypatch, profile):
+        import json as _json
+        (tmp_path / "strings.json").write_text(
+            _json.dumps(self.STRINGS, ensure_ascii=False), encoding="utf-8")
+        (tmp_path / "profile.json").write_text(_json.dumps(profile), encoding="utf-8")
+
+        def stub_factory(_profile):
+            return lambda system, user: _json.dumps(
+                [{"id": 0, "tr": "คุณ"}, {"id": 1, "tr": "ใช่"}])
+
+        monkeypatch.setitem(translate_api.PROVIDERS, "stub", stub_factory)
+        monkeypatch.setattr(translate_api.time, "sleep", lambda *_: None)
+        monkeypatch.setattr(
+            translate_api.sys, "argv",
+            ["translate_api.py", "--profile", str(tmp_path / "profile.json")])
+        translate_api.main()
+        tm = _json.loads(
+            (tmp_path / ".ftp" / "translation_memory.json").read_text(encoding="utf-8"))
+        return tm["entries"]
+
+    def test_variants_record_the_addressee(self, tmp_path, monkeypatch):
+        entries = self._run(tmp_path, monkeypatch, self.PROFILE)
+        variant = entries["You."]["variants"][0]
+        assert (variant["speaker"], variant["target"]) == ("mc", "my")
+
+    def test_target_stays_null_without_relationships(self, tmp_path, monkeypatch):
+        profile = {**self.PROFILE,
+                   "speakers": {"mc": {"name": "MC"}, "my": {"name": "Maya"}}}
+        entries = self._run(tmp_path, monkeypatch, profile)
+        variant = entries["You."]["variants"][0]
+        assert (variant["speaker"], variant["target"]) == ("mc", None)

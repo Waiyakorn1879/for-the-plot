@@ -50,6 +50,11 @@
             "type": "string",
             "description": "This code is the same person as another code — common in visual novels where a character is '???' until introduced. Everything else in this record is ignored; the target's record is used, and the two codes share QA rules."
           },
+          "called": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Names and nicknames the script uses to ADDRESS this character (\"Mr. Reed\", \"Sis\"). Feeds the vocative tier of addressee resolution; the record's `name` is included automatically. Add the forms that actually appear in dialog, not every possible variant."
+          },
           "register": { "type": "string", "description": "Prose voice guidance: formality, warmth, sentence rhythm, slang tolerance." },
           "self_pronoun": { "type": "string", "description": "Default first-person pronoun/speech level. Override per relationship in `to`." },
           "address_pronoun": { "type": "string", "description": "Default second-person pronoun. Override per relationship in `to`." },
@@ -73,12 +78,17 @@
           },
           "to": {
             "type": "object",
-            "description": "Per-relationship overrides, keyed by the OTHER speaker's code. In register-rich languages the pronoun is a property of the pair, not the person: the same protagonist may use a casual pronoun with a close friend and a formal one with an authority figure. Declared, not auto-detected — these are shown to the translator alongside the scene, because an addressee resolver that guesses wrong is wrong silently and everywhere.",
+            "description": "Per-relationship overrides, keyed by the OTHER speaker's code. In register-rich languages the pronoun is a property of the pair, not the person: the same protagonist may use a casual pronoun with a close friend and a formal one with an authority figure. Always shown to the translator as a table; from v1.5 the row that applies to a line is also named outright wherever the addressee could be resolved confidently (see `relationships`).",
             "additionalProperties": {
               "type": "object",
               "properties": {
                 "self_pronoun": { "type": "string" },
                 "address_pronoun": { "type": "string" },
+                "forbidden": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Terms this character must never use TO this particular person (crude pronouns toward a professor, a nickname only one friend is allowed). Enforced as a category-3 QA rule, but only on lines whose addressee resolved at or above min_confidence — an unresolved line is never judged against a relationship."
+                },
                 "note": { "type": "string" }
               }
             }
@@ -98,6 +108,53 @@
           }
         },
         "required": ["name"]
+      }
+    },
+    "relationships": {
+      "type": "object",
+      "description": "Addressee resolution: which character each line is spoken TO, so the right row of `speakers[x].to` can be applied. Answers come from named evidence only and every line the evidence does not cover stays unresolved. Omit entirely for the defaults.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Defaults to true when the profile declares any relationship data (a `to` map on some character, or a `declared` scope), false otherwise — so a profile that never mentions relationships behaves exactly as it did before v1.5."
+        },
+        "min_confidence": {
+          "type": "string",
+          "enum": ["dyad", "vocative", "declared"],
+          "default": "dyad",
+          "description": "The weakest evidence tier allowed to drive prompts, TM context, and QA rules. `declared` = a scope below names the pair; `vocative` = the English line addresses someone by name in vocative position; `dyad` = the enclosing Ren'Py label has exactly two character speakers. Raising this withholds weaker answers; they still appear in the relationships.py report."
+        },
+        "declared": {
+          "type": "array",
+          "description": "Hand-authored addressee scopes, checked in order; the first match wins and outranks every other tier. Use them for the passages resolution gets wrong or cannot see — a crowded scene, a phone call, a letter read aloud.",
+          "items": {
+            "type": "object",
+            "description": "Constrain with any of file/label/lines, then name the pairing with `pairs` or `cast`.",
+            "properties": {
+              "file": { "type": "string", "description": "Restrict to one .rpy file (basename, as it appears in strings.json)." },
+              "label": { "type": "string", "description": "Restrict to one Ren'Py label." },
+              "lines": {
+                "type": "array",
+                "items": { "type": "integer" },
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "[first, last] source line numbers, inclusive."
+              },
+              "pairs": {
+                "type": "object",
+                "additionalProperties": { "type": "string" },
+                "description": "Speaker code -> addressee code. Only the speakers listed resolve."
+              },
+              "cast": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Shorthand for a two-person exchange: each of the two addresses the other."
+              }
+            }
+          }
+        }
       }
     },
     "keep_untranslated": {

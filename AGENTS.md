@@ -23,6 +23,7 @@ All in `skills/renpy-translation/scripts/`, cross-platform, UTF-8, stdlib-only:
 | `qa_check.py` | technical + register QA; exit 1 while hard issues remain |
 | `build_patch.py` | progress JSON → drop-in patch files |
 | `translation_memory.py` | translation cache: `stats` / `export` / `import` / `clean` |
+| `relationships.py` | who each line is spoken to: resolution + coverage report |
 | `characters.py` | character records → persona cards + QA register rules (library, not a CLI) |
 | `validation.py` | shared output-validity gate and atomic writer (library, not a CLI) |
 
@@ -45,5 +46,6 @@ python skills/renpy-translation/scripts/qa_check.py --profile profile.json --tec
 
 Two design notes worth knowing before changing anything:
 
-- **`validation.py` and `characters.py` are the only shared imports.** Every other tool talks through files. The validity gate, the atomic writer, and the character records live there because each must be *identical* everywhere — a check the bulk translator enforces and QA doesn't is worse than no check, and a voice the prompt asks for but the gate doesn't check is worse than either alone. Shared helpers may be imported; shared stores (the Translation Memory) may not.
+- **`validation.py`, `characters.py` and `relationships.py` are the only shared imports.** Every other tool talks through files. The validity gate, the atomic writer, the character records, and addressee resolution live there because each must be *identical* everywhere — a check the bulk translator enforces and QA doesn't is worse than no check, a voice the prompt asks for but the gate doesn't check is worse than either alone, and a QA rule that judges a different pairing than the prompt named is worse still. Shared helpers may be imported; shared stores (the Translation Memory) may not.
+- **Addressee resolution must be able to refuse.** `relationships.py` answers only from evidence it can name in a report, and returns *unresolved* with a reason otherwise. A wrong addressee yields a wrong pronoun on a well-formed line — invisible to every other check. Do not add a tier that fires when the others decline (ADR-020).
 - **Nothing unvalidated is persisted.** An echoed source has an identical token signature, so token parity alone once let untranslated English into the progress store *and* into the cache, where it was served back for free forever. Rejection happens before both writes, and on cache reads too.

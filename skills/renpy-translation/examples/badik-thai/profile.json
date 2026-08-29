@@ -40,6 +40,10 @@
         "isa": {
           "self_pronoun": "ผม",
           "address_pronoun": "คุณ",
+          "forbidden": [
+            "กู",
+            "มึง"
+          ],
           "note": "professor — formal, never กู/มึง"
         },
         "ji": {
@@ -263,6 +267,10 @@
       "gender": "?",
       "role": "child"
     }
+  },
+  "relationships": {
+    "min_confidence": "dyad",
+    "declared": []
   },
   "validation": {
     "target_script": "thai"

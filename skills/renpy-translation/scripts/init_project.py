@@ -49,6 +49,9 @@ $SCRIPTS = "{scripts}"     # PowerShell
 # where am I
 python $SCRIPTS/qa_check.py --profile profile.json --technical-only
 
+# who is talking to whom (once speakers[x].to is filled in)
+python $SCRIPTS/relationships.py --profile profile.json
+
 # untranslated strings = entries in strings.json whose text is not a key
 # in translations.json. Work through them in batches of 40-60, contiguous
 # by file+line so scene context stays visible.
@@ -76,6 +79,7 @@ register quality. A bulk API pass is a draft that always needs review.
 | `profile.json` | machine config: speakers/characters, glossary, validation, paths |
 | `translation-guide.md` | the style guide: registers, formality, slang policy |
 | `qa_rules.json` | declarative register checks beyond what characters declare |
+| `relationships.py --profile` | who-speaks-to-whom report (coverage, conflicts, gaps) |
 | `decompiled/` | decompiled game scripts (never commit) |
 | `strings.json` | extracted source strings (never commit) |
 | `translations.json` | **the progress store — the source of truth** (never commit) |
@@ -93,6 +97,14 @@ State the highest-frequency decision here in one line, because it settles the
 majority of register questions:
 
 > Who calls the protagonist what: _(fill in)_
+
+In register-rich languages the pronoun belongs to the **pair**, not the person:
+put those in `speakers[code].to`. Which pair applies to a given line is worked
+out by `relationships.py`, which answers only from evidence it can name — a
+declared scope, a name in vocative position, or a label with exactly two
+speakers — and leaves everything else unresolved rather than guessing. Run its
+report to see the coverage you actually have, and which resolved pairs you have
+not declared a register for yet.
 
 ## Known style corrections
 
@@ -158,6 +170,12 @@ progress), protagonist↔authority figures, rivals→protagonist._
 Per-character pronouns belong in `profile.json` → `speakers[code]` and its
 `to` map, where the tooling can read them. Use this file for the reasoning
 and for anything prose-shaped.
+
+One source word can need three different renderings depending on who says it to
+whom — a term of address from the protagonist to a stranger, from an inner voice
+to the protagonist, and describing a third party are three different words. That
+is relationship reasoning, not a glossary one-liner; write it here and encode
+the mechanical part in `to`.
 
 ## Slang and profanity policy
 
@@ -235,6 +253,7 @@ def build_profile(name, language_id, language_name, output_dir):
         "style_guide_file": "translation-guide.md",
         "qa_rules_file": "qa_rules.json",
         "speakers": {},
+        "relationships": {"declared": []},
         "keep_untranslated": [],
         "validation": {},
         "api": {"provider": "openai-compatible", "batch_size": 20, "temperature": 0.3},

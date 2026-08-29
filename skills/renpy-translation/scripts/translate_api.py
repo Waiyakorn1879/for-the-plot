@@ -31,7 +31,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from characters import cast_block, character_line, resolve_alias
+from characters import cast_block, character_line, display_name, resolve_alias
+from relationships import build_resolver, relationships_config
 from translation_memory import (
     TranslationContext, TranslationMemory, resolve_tm_path, tm_enabled,
 )
@@ -113,6 +114,17 @@ def load_profile(path):
     return profile, profile_path.parent
 
 
+# Explains the per-line `to` field. Appended ONLY when addressee resolution is
+# enabled for this profile, so a project that declares no relationships gets
+# byte-identical prompts to v1.4 — and so the system prompt stays static across
+# batches, which is what makes provider prompt caching work.
+ADDRESSEE_RULE = """ADDRESSEE:
+- A line's "to" field names who it is spoken TO. Apply that speaker's rules for
+  that specific person from the cast block (pronouns, register, address terms).
+- When "to" is absent the addressee is not known. Use the speaker's default
+  register; do not guess a relationship from the line's content."""
+
+
 def build_system_instruction(profile, base_dir):
     game = profile.get("game_name", "a Ren'Py visual novel")
     lang = profile.get("language_name", profile.get("language_id", "the target language"))
@@ -132,12 +144,15 @@ def build_system_instruction(profile, base_dir):
         else:
             print(f"warning: style guide not found: {style_path}")
 
+    addressee = (ADDRESSEE_RULE + "\n"
+                 if relationships_config(profile)["enabled"] else "")
+
     return f"""You translate English dialog from the visual novel "{game}" into {lang}.
 
 {glossary}
 {style}
 {TOKEN_RULES}
-
+{addressee}
 OUTPUT FORMAT:
 Reply with ONLY a JSON array of objects: [{{"id": N, "tr": "..."}}, ...]
 - id matches the input id
@@ -507,12 +522,17 @@ RETRY_NAGS = {
 
 
 def translate_batch(call_model, system, speakers, lang_name, batch,
-                    retry=False, reasons=("TOKEN",)):
+                    retry=False, reasons=("TOKEN",), resolver=None):
     """batch: list of {id, text, speaker, kind}. Returns list of {id, tr}.
 
     `reasons` selects the retry nag(s). Telling a model its tokens mismatched
     when it actually echoed the source teaches it the wrong lesson, so the
     retry names what really failed.
+
+    `resolver` (v1.5) adds a "to" field naming the addressee on lines where one
+    could be resolved confidently. Lines it declines to resolve carry no "to"
+    at all rather than a guess — the cast block still shows the speaker's whole
+    relationship table, which is exactly the v1.4 behavior for those lines.
     """
     # Persona cards for this batch's cast, emitted ONCE up front. Repeating a
     # full card on every line would multiply the prompt by the batch size; the
@@ -522,8 +542,10 @@ def translate_batch(call_model, system, speakers, lang_name, batch,
     lines = []
     for item in batch:
         sp = speaker_blurb(speakers, item["speaker"])
+        target = resolver.target_for(item) if resolver else None
+        to = f'"to": "{display_name(speakers, target)}", ' if target else ""
         lines.append(
-            f'{{"id": {item["id"]}, "speaker": "{sp}", "kind": "{item["kind"]}", '
+            f'{{"id": {item["id"]}, "speaker": "{sp}", {to}"kind": "{item["kind"]}", '
             f'"text": {json.dumps(item["text"], ensure_ascii=False)}}}'
         )
     user_msg = (f"Translate these lines to {lang_name}. Output JSON array only.\n\n"
@@ -594,6 +616,16 @@ def main():
     for i, e in enumerate(strings):
         e["id"] = i
 
+    # Addressee resolution (v1.5). One resolver for the whole run: the prompt
+    # and the TM context must name the same person for the same line, or the
+    # variant a run writes is not the variant the next run retrieves.
+    resolver = build_resolver(profile, strings)
+    if resolver.enabled:
+        resolved = sum(1 for e in strings if resolver.target_for(e))
+        print(f"Addressee resolution: on (min_confidence="
+              f"{resolver.min_confidence}) — {resolved}/{len(strings)} line(s) "
+              f"resolved. Run relationships.py for the full report.")
+
     if progress_file.exists():
         progress = json.loads(progress_file.read_text(encoding="utf-8"))
     else:
@@ -624,6 +656,7 @@ def main():
             # so an alias code would build a second, disjoint variant set for
             # one character and pay for the same translation twice.
             ctx = TranslationContext(speaker=resolve_alias(speakers, e.get("speaker")),
+                                     target=resolver.target_for(e),
                                      file=e.get("file"), line=e.get("line"))
             hit = tm.lookup(e["text"], ctx)
             if hit is None:
@@ -675,12 +708,14 @@ def main():
         batch = todo[i:i + batch_size]
         print(f"\nBatch {batch_num} ({i+1}-{i+len(batch)} of {len(todo)})...")
         try:
-            result = translate_batch(call_model, system, speakers, lang_name, batch)
+            result = translate_batch(call_model, system, speakers, lang_name, batch,
+                                     resolver=resolver)
         except Exception as e:
             print(f"  API error: {e}. Sleeping 10s and retrying once.")
             time.sleep(10)
             try:
-                result = translate_batch(call_model, system, speakers, lang_name, batch)
+                result = translate_batch(call_model, system, speakers, lang_name,
+                                         batch, resolver=resolver)
             except Exception as e2:
                 print(f"  Still failing: {e2}. Skipping batch.")
                 continue
@@ -709,7 +744,8 @@ def main():
             print(f"  Retrying {len(mismatches)} entries ({', '.join(codes)})...")
             retry_result = translate_batch(call_model, system, speakers, lang_name,
                                            [item for item, _ in mismatches],
-                                           retry=True, reasons=codes)
+                                           retry=True, reasons=codes,
+                                           resolver=resolver)
             for r in retry_result:
                 if isinstance(r, dict) and "id" in r and "tr" in r:
                     id_to_tr[r["id"]] = r["tr"]
@@ -737,6 +773,7 @@ def main():
                 # would collapse them to one speaker and mis-tag variants).
                 ctx = TranslationContext(
                     speaker=resolve_alias(speakers, item.get("speaker")),
+                    target=resolver.target_for(item),
                     file=item.get("file"), line=item.get("line"))
                 tm.add(item["text"], tr, ctx)
         print(f"  Accepted {accepted}/{len(batch)}. Total done: {len(progress)}")

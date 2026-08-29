@@ -1,9 +1,17 @@
 """Extract translatable strings from Ren'Py .rpy files.
 
-Outputs a JSON list of {text, speaker, file, line, kind}
+Outputs a JSON list of {text, speaker, file, line, kind, label}
 - kind = "say" | "menu" | "text" | "narrator"
 - with --screens additionally: "screen" (literal text/textbutton/label/tooltip
   inside screen blocks) and "ui" (_()-wrapped strings anywhere).
+- label = the enclosing Ren'Py label, or null outside any. It is the script's
+  own scene boundary, and relationships.py scopes addressee resolution to it;
+  strings.json files extracted before v1.5 simply lack the field.
+- label_cast (say lines only) = every speaker code that speaks anywhere in that
+  label. Recorded BEFORE deduplication, because dedupe is what makes the
+  question unanswerable downstream: a minor character whose only line in a
+  scene is "Yeah." loses it to an earlier duplicate, and a three-person scene
+  then looks like a two-person one to anything counting surviving speakers.
 Duplicates are skipped by exact text match unless --no-dedupe is given
 (keep duplicates when targeting native `translate` blocks, where each
 occurrence can translate differently).
@@ -42,6 +50,10 @@ MENU_RE = re.compile(
 SHOWTEXT_RE = re.compile(
     r'^(\s*)show\s+text\s+"((?:[^"\\]|\\.)*)"'
 )
+# label statement: `label chapter1:` / `label ch1(x=1):` / `label .retry:`
+# The label is the only scene boundary a Ren'Py script states outright, so it
+# is what addressee resolution scopes its dyad test to (see relationships.py).
+LABEL_RE = re.compile(r'^label\s+(\.?\w+)\s*(?:\([^)]*\))?\s*:\s*$')
 # screen definition header: `screen name(...):`
 SCREEN_START_RE = re.compile(r'^screen\s+\w+.*:\s*$')
 # literal-string screen statements: text/textbutton/label/tooltip "..."
@@ -76,6 +88,7 @@ def extract(rpy_path: Path, screens=False):
     python_indent = None
     in_screen_block = False
     screen_indent = None
+    label = None
     with rpy_path.open(encoding="utf-8", errors="replace") as f:
         for lineno, raw in enumerate(f, 1):
             line = raw.rstrip("\n")
@@ -89,7 +102,8 @@ def extract(rpy_path: Path, screens=False):
                     txt = m.group(2)
                     if txt.strip() and has_translatable_content(txt):
                         out.append({"text": txt, "speaker": "_ui",
-                                    "file": rpy_path.name, "line": lineno, "kind": "ui"})
+                                    "file": rpy_path.name, "line": lineno, "kind": "ui",
+                                    "label": label})
 
             # Track python blocks (skip them)
             if in_python_block:
@@ -117,7 +131,7 @@ def extract(rpy_path: Path, screens=False):
                             if txt.strip() and has_translatable_content(txt):
                                 out.append({"text": txt, "speaker": "_screen",
                                             "file": rpy_path.name, "line": lineno,
-                                            "kind": "screen"})
+                                            "kind": "screen", "label": label})
                         continue
                     in_screen_block = False
                 if SCREEN_START_RE.match(stripped):
@@ -125,13 +139,28 @@ def extract(rpy_path: Path, screens=False):
                     screen_indent = indent
                     continue
 
+            # label statement — records the scene a line belongs to. A label
+            # runs until the next one (Ren'Py falls through), which is exactly
+            # the span addressee resolution treats as one scene.
+            m = LABEL_RE.match(stripped)
+            if m:
+                name = m.group(1)
+                if name.startswith("."):
+                    # A local label belongs to its enclosing global one; on its
+                    # own `.retry` is not unique across the file.
+                    label = (label.split(".", 1)[0] + name) if label else name
+                else:
+                    label = name
+                continue
+
             # show text "..."
             m = SHOWTEXT_RE.match(line)
             if m:
                 txt = m.group(2)
                 if txt.strip():
                     out.append({"text": txt, "speaker": "_text",
-                                "file": rpy_path.name, "line": lineno, "kind": "text"})
+                                "file": rpy_path.name, "line": lineno, "kind": "text",
+                                "label": label})
                 continue
 
             # speaker "text"
@@ -144,7 +173,8 @@ def extract(rpy_path: Path, screens=False):
                 else:
                     if txt.strip():
                         out.append({"text": txt, "speaker": speaker,
-                                    "file": rpy_path.name, "line": lineno, "kind": "say"})
+                                    "file": rpy_path.name, "line": lineno, "kind": "say",
+                                    "label": label})
                     continue
 
             # menu choice
@@ -153,7 +183,8 @@ def extract(rpy_path: Path, screens=False):
                 txt = m.group(2)
                 if txt.strip():
                     out.append({"text": txt, "speaker": "_menu",
-                                "file": rpy_path.name, "line": lineno, "kind": "menu"})
+                                "file": rpy_path.name, "line": lineno, "kind": "menu",
+                                "label": label})
                 continue
 
             # narrator (bare string on its own line, indented)
@@ -162,9 +193,35 @@ def extract(rpy_path: Path, screens=False):
                 txt = m.group(2)
                 if txt.strip():
                     out.append({"text": txt, "speaker": "narrator",
-                                "file": rpy_path.name, "line": lineno, "kind": "narrator"})
+                                "file": rpy_path.name, "line": lineno, "kind": "narrator",
+                                "label": label})
                 continue
-    return out
+    return stamp_label_cast(out)
+
+
+def stamp_label_cast(entries):
+    """Record each label's full speaking cast on its `say` lines.
+
+    Computed here, over one file's complete output, because this is the last
+    point at which the answer is knowable: `main()` deduplicates by text
+    afterwards, and dedupe can only ever *remove* a speaker from a label — so a
+    cast counted downstream can turn a three-party scene into an apparent
+    two-party one, never the reverse. That is the dangerous direction, and it
+    would resolve confidently to the wrong addressee.
+    """
+    # Keyed by label name within one file. Two scenes can only ever share a key
+    # through a malformed script (a local `.retry` before any global label, so
+    # its qualified name is bare), and the effect of a shared key is a UNION of
+    # casts — which can turn a dyad into a multi-party refusal but never the
+    # reverse. The collision over-refuses; it cannot mis-resolve.
+    cast = {}
+    for entry in entries:
+        if entry["kind"] == "say" and entry["label"]:
+            cast.setdefault(entry["label"], set()).add(entry["speaker"])
+    for entry in entries:
+        if entry["kind"] == "say" and entry["label"]:
+            entry["label_cast"] = sorted(cast[entry["label"]])
+    return entries
 
 
 def load_profile(path):

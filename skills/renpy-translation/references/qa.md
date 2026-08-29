@@ -25,7 +25,7 @@ Exit code is 1 while "hard" (non-review) issues remain — usable as a gate befo
 
 1. **Technical (built-in, must fix):** missing translations, untranslated output, `{tag}` / `[variable]` / `\escape` / `%%` mismatches. These break rendering, crash the game, or ship English to the player. Always zero before a patch build.
 2. **Register violations — speaker identity:** a character using language their persona forbids (e.g. a refined character using gutter pronouns). Declarative rules.
-3. **Register violations — relationship/context:** correct words in the wrong company (e.g. crude pronouns while talking to a teacher or love interest). Declarative rules with `near` context conditions.
+3. **Register violations — relationship/context:** correct words in the wrong company (e.g. crude pronouns while talking to a teacher or love interest). Declarative rules restricted by resolved addressee (`to` / `to_group`), or by `near` context conditions where no addressee could be resolved.
 4. **Phrasing flags (review, not auto-fix):** built-in untranslated-Latin-word and truncation checks, plus any declarative rules marked category 4 (awkward loanwords etc.).
 
 ## Rules from character records (no authoring needed)
@@ -39,6 +39,17 @@ A `forbidden` list on a character in `profile.json` → `speakers` becomes a **c
 - Codes with `alias_of` pointing at that character are covered by the same rule, so a character who is `"???"` before introduction can't slip through.
 - `must_use` is **advisory only** — a category-4 flag on longer lines. A short reply legitimately carries none of a character's signature vocabulary, so it must never block a build.
 - Terms are regex-escaped and matched literally. A hand-written rule in `qa_rules.json` with the same `name` shadows the generated one, so you can override the category or add a `near` condition without double-reporting.
+
+A `forbidden` list inside a **relationship** becomes a **category-3 rule** the same way — terms this character must never use *to this particular person*:
+
+```json
+"mc": { "name": "MC",
+        "to": { "prof": { "address_pronoun": "…", "forbidden": ["กู", "มึง"] } } }
+```
+
+That rule only fires on lines whose addressee `relationships.py` resolved at or above the profile's `min_confidence`. An unresolved line is **not** judged against a relationship — there is no pairing to judge it against, and inventing one would flag correct text. Run `relationships.py --profile profile.json` to see how much of the script actually resolves before relying on these.
+
+Only `to[…].forbidden` generates a rule. Pronoun fields do not: they describe what to write, and a pronoun's absence from a line is not evidence of anything.
 
 Use `qa_rules.json` below for rules that depend on **context** rather than speaker identity.
 
@@ -85,8 +96,11 @@ Rule semantics — a rule fires when ALL of these hold:
 - `speakers` / `speakers_group`: the line's speaker is in the list/named group (omit → any speaker)
 - `skip_monologue`: if true, lines wrapped in `(...)` are exempt (inner thoughts often allow cruder register)
 - `pattern`: regex found in the **translation**
-- `near` (optional): within ±`window` strings in the same file, characters from `group` appear at least `min` times, and at least as often as every group in `dominant_over`. This approximates "who is the speaker talking to" without parsing scene structure — tune `window` (default 12) if scenes are long.
+- `to` / `to_group` (optional): the line's **resolved addressee** is that code (or in that named group). Lines whose addressee is unresolved never match. This is the exact answer; prefer it over `near`.
+- `near` (optional): within ±`window` strings in the same file, characters from `group` appear at least `min` times, and at least as often as every group in `dominant_over`. This *approximates* "who is the speaker talking to" by proximity — use it for the lines `to` cannot cover (crowded scenes, a register that depends on who is merely present rather than addressed). Tune `window` (default 12) if scenes are long.
 - `dedupe` (default true): report each (rule, text) pair once.
+
+Findings name the pairing they were judged against: `spk=mc→prof` means the addressee resolved to `prof`, while a bare `spk=mc` means it did not resolve and only speaker-level rules applied.
 
 Regex notes: patterns run on raw translation text. For languages without word boundaries (Thai), a lookaround can exclude a known compound — e.g. `กู(?![้ล])` avoids matching กู้ (to borrow) and กูล. **But read the next section before reaching for one.**
 

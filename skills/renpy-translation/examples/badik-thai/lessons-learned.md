@@ -71,3 +71,47 @@ and Isabella, who declare those terms forbidden individually. On a new project,
 prefer per-character `forbidden` for speaker-identity rules and keep
 `qa_rules.json` for **context**-dependent ones (`near`), which records can't
 express.
+
+## What v1.5 changes about this example
+
+The section above says the quiet part: *register is a context problem*, and
+the context that mattered was **who MC is talking to**. This project answered
+that with the ±12-line proximity heuristic, because nothing better existed. It
+worked well enough to catch most violations — as a *report*. It was never
+trustworthy enough to decide a pronoun.
+
+v1.5 separates those two jobs. `relationships.py` resolves the addressee from
+evidence it can name — a declared scope, a name addressed in vocative position
+in the English, or a Ren'Py label with exactly two character speakers — and
+says *unresolved* for everything else. What that buys, concretely, on a
+project shaped like this one:
+
+- **The prompt names the listener.** On a resolved line the translator is told
+  `"to": "Sage"` rather than being handed MC's whole six-row `to` table and
+  asked to work it out from the scene. The table still travels for the lines
+  that don't resolve.
+- **`to[…].forbidden` makes the pronoun matrix enforceable per pair.** MC's
+  Isabella row said *"professor — formal, never กู/มึง"* in a `note` — a
+  sentence no tool could read. It is now a field, and it generates the
+  category-3 rule automatically. Compare that with the `near`-based
+  `ผม-group กู` rule, which fires on *company* rather than on *addressee*.
+- **`relationships.py --profile profile.json` is the audit that did not exist.**
+  The 20+ one-off fix scripts this project wrote were all answering questions
+  the report answers by construction: which pairs actually occur, which of them
+  have no declared register yet, and which speaker codes never got a record at
+  all (`ice`, `dad2`, `kid` in this profile are exactly that shape).
+
+The overlap note above now has a second case: on a line whose addressee
+resolves to Isabella, both the new per-relationship rule and the older
+`ผม-group กู` proximity rule can report the same violation. That is redundancy,
+not a false positive, and this repo's stated bias is toward noise over silence
+— but on a new project, prefer the addressee-based rule and keep `near` for
+the register questions that genuinely depend on **who is present** rather than
+on who is addressed (a crude line is crude because a professor is in the room,
+whoever it was aimed at).
+
+What v1.5 still does not fix, and this project would still hit: one English
+line can only carry one translation in the runtime-filter patch. Knowing that
+MC said "You." to Sage in one scene and to Isabella in another does not let
+the patch ship both renderings — that needs native translate blocks and
+occurrence-aware translation.

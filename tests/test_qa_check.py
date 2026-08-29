@@ -350,3 +350,126 @@ class TestAliasReachesAuthoredRules:
                       rules, {"speakers": speakers})
         assert proc.stdout.count("[Maya: forbidden term]") == 1
         assert "Cat 3:    1" in proc.stdout
+
+
+def say_l(text, speaker, line, label="scene1", file="a.rpy", cast=None):
+    """A say line carrying the label cast the extractor states pre-dedupe."""
+    return {"text": text, "speaker": speaker, "file": file, "line": line,
+            "kind": "say", "label": label,
+            "label_cast": cast or ["amy", "mc", "prof"]}
+
+
+class TestRelationshipRules:
+    """Category 3 becomes reachable from declared data (v1.5).
+
+    The pairing a rule fires on is the pairing relationships.py resolved, so
+    the gate checks the relationship the translator was actually shown.
+    """
+
+    SPEAKERS = {
+        "mc": {"name": "Ethan",
+               "to": {"prof": {"address_pronoun": "formal",
+                               "forbidden": ["GRR"]}}},
+        "prof": {"name": "Sandra"},
+        "amy": {"name": "Amy"},
+    }
+
+    def test_generated_rule_fires_on_the_resolved_pair(self, tmp_path):
+        strings = [say_l("Hey there.", "mc", 1, cast=["mc", "prof"]),
+                   say_l("Sit down.", "prof", 2, cast=["mc", "prof"])]
+        proc = run_qa(tmp_path, strings,
+                      {"Hey there.": "GRR γεια", "Sit down.": "κάτσε"},
+                      None, {"speakers": self.SPEAKERS})
+        assert "[Ethan to Sandra: forbidden term]" in proc.stdout
+        assert "spk=mc→prof" in proc.stdout
+        assert "Cat 3:    1" in proc.stdout
+
+    def test_the_same_term_is_fine_with_someone_else(self, tmp_path):
+        strings = [say_l("Hey there.", "mc", 1, cast=["amy", "mc"]),
+                   say_l("Sit down.", "amy", 2, cast=["amy", "mc"])]
+        proc = run_qa(tmp_path, strings,
+                      {"Hey there.": "GRR γεια", "Sit down.": "κάτσε"},
+                      None, {"speakers": self.SPEAKERS})
+        assert "forbidden term" not in proc.stdout
+        assert proc.returncode == 0
+
+    def test_an_unresolved_addressee_never_fires_the_rule(self, tmp_path):
+        # Three speakers in the label: the addressee is unknown, so a
+        # relationship rule has no pairing to judge and stays silent.
+        strings = [say_l("Hey there.", "mc", 1), say_l("Sit down.", "prof", 2),
+                   say_l("Hi.", "amy", 3)]
+        proc = run_qa(tmp_path, strings,
+                      {"Hey there.": "GRR γεια", "Sit down.": "κάτσε", "Hi.": "γεια"},
+                      None, {"speakers": self.SPEAKERS})
+        assert "forbidden term" not in proc.stdout
+
+    def test_authored_to_rule_restricts_by_addressee(self, tmp_path):
+        rules = {"rules": [{"name": "formal only", "category": 3,
+                            "speakers": ["mc"], "to": "prof", "pattern": "GRR"}]}
+        strings = [say_l("Hey there.", "mc", 1, cast=["mc", "prof"]),
+                   say_l("Sit down.", "prof", 2, cast=["mc", "prof"])]
+        proc = run_qa(tmp_path, strings,
+                      {"Hey there.": "GRR γεια", "Sit down.": "κάτσε"},
+                      rules, {"speakers": self.SPEAKERS})
+        assert "[formal only]" in proc.stdout
+
+    def test_authored_to_group_rule(self, tmp_path):
+        rules = {"groups": {"staff": ["prof"]},
+                 "rules": [{"name": "formal only", "category": 3,
+                            "to_group": "staff", "pattern": "GRR"}]}
+        strings = [say_l("Hey there.", "mc", 1, cast=["mc", "prof"]),
+                   say_l("Sit down.", "prof", 2, cast=["mc", "prof"])]
+        proc = run_qa(tmp_path, strings,
+                      {"Hey there.": "GRR γεια", "Sit down.": "κάτσε"},
+                      rules, {"speakers": self.SPEAKERS})
+        assert "[formal only]" in proc.stdout
+
+    def test_header_reports_resolution(self, tmp_path):
+        strings = [say_l("Hey there.", "mc", 1, cast=["mc", "prof"]),
+                   say_l("Sit down.", "prof", 2, cast=["mc", "prof"])]
+        proc = run_qa(tmp_path, strings,
+                      {"Hey there.": "γεια", "Sit down.": "κάτσε"},
+                      None, {"speakers": self.SPEAKERS})
+        assert "Addressee: 2/2 resolved (min_confidence=dyad)" in proc.stdout
+
+    def test_min_confidence_gates_the_rule(self, tmp_path):
+        strings = [say_l("Hey there.", "mc", 1, cast=["mc", "prof"]),
+                   say_l("Sit down.", "prof", 2, cast=["mc", "prof"])]
+        proc = run_qa(tmp_path, strings,
+                      {"Hey there.": "GRR γεια", "Sit down.": "κάτσε"},
+                      None, {"speakers": self.SPEAKERS,
+                             "relationships": {"min_confidence": "declared"}})
+        assert "forbidden term" not in proc.stdout
+        assert "Addressee: 0/2 resolved" in proc.stdout
+
+
+class TestV14ReportIsUnchanged:
+    """The invariant that matters more than any single new check.
+
+    A profile that declares no relationships must produce the v1.4 report
+    byte for byte — same findings, same header, same summary — whether or not
+    its strings.json carries the new `label` field.
+    """
+
+    def test_report_is_byte_identical_without_relationships(self, tmp_path):
+        (tmp_path / "a").mkdir()
+        (tmp_path / "b").mkdir()
+        old = run_qa(tmp_path / "a", STRINGS, TRANSLATIONS, RULES)
+        labeled = [dict(s, label="scene1") for s in STRINGS]
+        new = run_qa(tmp_path / "b", labeled, TRANSLATIONS, RULES)
+        assert old.stdout == new.stdout
+        assert old.returncode == new.returncode
+
+    def test_a_populated_to_map_alone_adds_no_findings(self, tmp_path):
+        """v1.4 profiles already carry `to` matrices; upgrading must not turn
+        them red. Only the new `to[].forbidden` field generates a rule."""
+        speakers = {"mc": {"name": "Ethan",
+                           "to": {"prof": {"address_pronoun": "formal"}}},
+                    "prof": {"name": "Sandra"}}
+        strings = [say_l("Hey there.", "mc", 1, cast=["mc", "prof"]),
+                   say_l("Sit down.", "prof", 2, cast=["mc", "prof"])]
+        proc = run_qa(tmp_path, strings,
+                      {"Hey there.": "γεια", "Sit down.": "κάτσε"},
+                      None, {"speakers": speakers})
+        assert proc.returncode == 0
+        assert "Cat 3:    0" in proc.stdout

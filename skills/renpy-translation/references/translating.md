@@ -28,7 +28,9 @@ Protocol per working session:
 
 1. Load the game's `translation-guide.md` into context. For long sessions, re-skim it whenever register questions come up — drift is the main failure mode.
 2. Pick the next untranslated strings: entries of `strings.json` whose `text` is not yet in the progress file. Keep batches contiguous by file+line so scene context is visible. **Batch size 40–60** (see below).
-3. For each line, consider: who is speaking (speaker code → the character record in `profile.json` → `speakers`), to whom (look at surrounding lines — register often depends on the listener, not the speaker; check the speaker's `to` map for a declared pronoun for that pair), and kind (`menu` choices are usually imperative/short; monologue keeps its `(...)` wrapper and may have its own `monologue.self_pronoun`).
+3. For each line, consider: who is speaking (speaker code → the character record in `profile.json` → `speakers`), **to whom**, and kind (`menu` choices are usually imperative/short; monologue keeps its `(...)` wrapper and may have its own `monologue.self_pronoun`).
+
+   Register often depends on the listener more than on the speaker, so the addressee is the question worth spending attention on. `python relationships.py --profile profile.json` answers it for the lines it can — a declared scope, a name addressed in the English, or a two-person scene — and says so for the rest. Where it resolves, use the speaker's `to` entry for that person. Where it doesn't, read the surrounding lines yourself: an unresolved line is the tool telling you it needs a human, not that the addressee doesn't matter.
 4. Write the batch into the progress file (read-modify-write the JSON; never truncate it).
 5. After each session: `python qa_check.py --profile profile.json --technical-only` — zero category-1 issues before moving on. Run the full QA periodically.
 

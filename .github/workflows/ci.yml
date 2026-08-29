@@ -48,7 +48,16 @@ jobs:
           # v1.4: speakers IS the character dictionary (ADR-018) — no separate file.
           speaker = schema["properties"]["speakers"]["additionalProperties"]["properties"]
           assert {"register", "forbidden", "must_use", "to", "alias_of",
-                  "examples", "monologue"} <= set(speaker)
+                  "examples", "monologue", "called"} <= set(speaker)
+          # v1.5: relationships are resolved from named evidence (ADR-020).
+          rel = schema["properties"]["relationships"]["properties"]
+          assert {"enabled", "min_confidence", "declared"} <= set(rel)
+          assert set(rel["min_confidence"]["enum"]) == {"dyad", "vocative", "declared"}
+          # A tier that fires when the others decline is the rejected heuristic.
+          import sys
+          sys.path.insert(0, "skills/renpy-translation/scripts")
+          import relationships
+          assert relationships.TIERS == ("dyad", "vocative", "declared")
           print("manifests OK")
           EOF
 

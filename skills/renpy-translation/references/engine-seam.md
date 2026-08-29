@@ -25,9 +25,12 @@ A UTF-8 JSON array of objects. `extract_strings.py` is the Ren'Py implementation
 | `speaker` | A stable speaker code, or one of the pseudo-speakers `narrator`, `_text`, `_menu`, `_screen`, `_ui`. Used for register selection and TM context variants. |
 | `file`, `line` | Provenance. Must be **stable across re-extraction** — QA's context window (`qa_check.py`) and the TM's variant metadata both rely on them. Never use a value that shifts when unrelated text changes. |
 | `kind` | One of `say`, `narrator`, `menu`, `text`, `screen`, `ui`. `screen`/`ui` mark strings a runtime say-filter cannot see, which is what routes them into a different part of the patch. |
+| `label` | *Optional.* The name of the enclosing scene unit, or `null`. Emit it only if your engine states scene boundaries **outright**; a boundary you inferred is a boundary that will be wrong somewhere, and here that produces a wrong pronoun rather than a visible error. Omitting `label` and `label_cast` costs one resolution tier and nothing else. |
+| `label_cast` | *Optional, required with `label` for the dyad tier.* Every speaker code that speaks anywhere in that label, on each of that label's dialog entries. Must be computed **before deduplication** — that is the entire point of the field. Dedupe drops an occurrence whose text appeared earlier, so a third character whose only line in a scene is "Yeah." vanishes from the corpus; a consumer counting surviving speakers would read a three-person scene as a two-person one and resolve confidently to the wrong addressee. Dedupe can only *remove* speakers, so the error runs in exactly one direction, and it is the dangerous one. Emit `label` without `label_cast` and the resolver reports `no-cast` rather than guessing. |
 
 Rules:
 
+- **A field this contract does not define must not be invented.** Consumers read `label` because it is specified here; extra keys are ignored, and a consumer that started depending on one would silently break every other adapter.
 - **Dedupe by exact text, first occurrence wins** (unless the caller asks for per-occurrence output, which the delivery mechanism must then support).
 - **Never emit** identifiers, label/screen/image/audio names, pure-interpolation strings (`"[points]"`), or empty strings. Translating an identifier breaks the game silently — the worst failure class there is.
 - If your engine has a *mixed column* (a field that is sometimes player-facing copy and sometimes an internal code), classify it in the extractor and record the result in `kind`. The translator must never have to guess. A workable heuristic: a value matching `^[a-z0-9_.]+$` — all lowercase, only dots and underscores, no spaces — is an engine code; real UI copy has a space, a capital, or punctuation.
@@ -52,7 +55,8 @@ A flat UTF-8 JSON object mapping each `text` from Contract 1, **byte-identically
 **`[PORTABLE]` — unchanged for any engine:**
 
 - The profile system (`profile.json` + `translation-guide.md` + `qa_rules.json`) and `references/game-profile.md`
-- `scripts/translation_memory.py`, `scripts/validation.py`, `scripts/qa_check.py`
+- `scripts/translation_memory.py`, `scripts/validation.py`, `scripts/qa_check.py`, `scripts/characters.py`
+- `scripts/relationships.py` — with one caveat: the **vocative** tier reads the English source and assumes English word order and punctuation. It switches itself off when `source_language` is not `en`; the declared and dyad tiers stay available.
 - The progress store, token parity, the validation gate, the 4-category QA model
 - `references/translating.md`, `references/qa.md`, and `PLAYBOOK.md`
 

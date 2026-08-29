@@ -36,9 +36,11 @@ Watch for **one character under several codes** — a love interest who is `"???
   "register": "18-year-old male, casual contemporary",
   "self_pronoun": "<default>", "address_pronoun": "<default>",
   "monologue": { "self_pronoun": "<inner-thought form>" },
+  "called": ["<nicknames the script uses to address them>"],
   "to": {
     "sage": { "self_pronoun": "…", "address_pronoun": "…", "note": "closest friend" },
-    "prof": { "self_pronoun": "…", "address_pronoun": "…" }
+    "prof": { "self_pronoun": "…", "address_pronoun": "…",
+              "forbidden": ["<terms never used TO this person>"] }
   },
   "forbidden": ["<terms this character never uses>"],
   "examples": [{ "en": "…", "tr": "…", "note": "why this rendering is right" }]
@@ -46,6 +48,32 @@ Watch for **one character under several codes** — a love interest who is `"???
 ```
 
 The `to` map is the important part: a pronoun is a property of the **pair**. Declaring it once here beats repeating it in prose, because `translate_api.py` puts the table in the prompt and `qa_check.py` enforces `forbidden` automatically — no `qa_rules.json` entry needed.
+
+**Which pair applies to a line is worked out for you, where it can be.** `relationships.py` resolves the addressee from three kinds of evidence — a scope you declared, a name addressed in vocative position in the English line, or a Ren'Py label containing exactly two character speakers — and leaves every other line unresolved rather than guessing. Resolved lines get `"to": "<name>"` in the translation prompt and can be checked by category-3 QA rules; unresolved lines behave exactly as they did before, with the whole `to` table shown to the translator.
+
+Two limits worth knowing before you read the numbers. The vocative tier essentially never resolves *to the protagonist*, because most games render the player's name as a `[variable]` and a player-chosen name cannot be listed in `called` — lines addressed to the MC lean entirely on the dyad and declared tiers. And the dyad tier sees who *speaks* in a scene, not who is *present*: a third character standing there silently is invisible to it. Both are what `declared` scopes are for.
+
+Run the report early — before batch 1, right after the speakers are filled in:
+
+```
+python relationships.py --profile profile.json
+```
+
+It tells you the resolution rate per tier, why the rest did not resolve, which labels are two-person scenes, **which resolved pairs have no declared register yet** (the most useful column — it is a to-do list for step 2), and which speaker codes have no character record at all. Two knobs, both under `profile.json` → `relationships`:
+
+- `min_confidence` (`dyad` | `vocative` | `declared`, default `dyad`) — the weakest evidence allowed to act. Raise it if you check the report and disagree with a tier.
+- `declared` — hand-authored scopes for passages resolution gets wrong or cannot see (a crowded scene, a phone call, a letter read aloud). They outrank every other tier:
+
+```json
+"relationships": {
+  "declared": [
+    { "label": "ep1_dorm_argument", "cast": ["mc", "sage"] },
+    { "file": "script.rpy", "lines": [1200, 1310], "pairs": { "mc": "prof" } }
+  ]
+}
+```
+
+One source word can need three different renderings depending on who says it to whom — a term of address from the protagonist to a stranger, from an inner voice to the protagonist, and describing an absent third party are three different words. Encode the mechanical part in `to`; write the reasoning in `translation-guide.md`.
 
 Keep `translation-guide.md` for the *reasoning* and anything prose-shaped. Two `examples` per character reach the prompt; a `note` explaining **why** a rendering is right is worth more than a third example.
 
