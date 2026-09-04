@@ -1,12 +1,13 @@
 # Lessons learned: Being a DIK → Thai
 
-What shipping the EP1 Thai patch (2,638 strings → 2,636 translated, 99.9%) taught us. Read this when starting a new game — most of it generalizes.
+What shipping the Thai patch taught us — EP1 first (2,638 strings → 2,636 translated, 99.9%), then Episodes 1–8 (~36,000 strings, 99%+), with Season 3 in progress and an in-game phone-chat sub-patch on the side. Read this when starting a new game — most of it generalizes.
 
 ## Numbers that calibrate expectations
 
-- EP1 alone: 2,638 unique strings across 8 decompiled `.rpy` files (one 234 KB main script + freeroams + a report screen).
-- API bulk pass (Gemini 2.5 Pro, batches of 20, token validation + one retry): 99.9% acceptance. 2 strings with unstable tag formatting failed validation twice and were left displaying English — acceptable; chasing the last 0.1% wasn't worth it.
-- The QA + register-fix loop took comparable effort to the initial translation. Budget for it.
+- EP1 alone: 2,638 unique strings across 8 decompiled `.rpy` files (one 234 KB main script + freeroams + a report screen). Full game EP1–8: ~36,000, plus ~1,000 more in the phone system that the say-filter can't see (its own sub-dictionaries and wrapper layer).
+- API bulk pass: 99%+ acceptance with token validation + one retry. A handful of strings per episode with unstable tag formatting failed validation twice and were left displaying English — acceptable; chasing the last fraction of a percent isn't worth it. EP1 ran on Gemini 2.5 Pro at batches of 20; by Season 3 the bulk pass had moved to the headless **Claude Code CLI provider** (no API key) at batches of 200, with the style guide loaded once per session instead of re-sent per batch.
+- The QA + register-fix loop took comparable effort to the initial translation, **every episode**. It does not amortize — each episode brings new scenes, new pairings, and new register edge cases. Budget for it per episode, not once.
+- Register knowledge compounds across episodes: the pronoun matrix and per-character `forbidden` lists built for EP1 carried forward, and the Translation Memory made repeated lines and game-version bumps free. New-character cost (Season 3 adds Zoey, Nicole, Elena) is a profile edit, not a re-translation.
 
 ## Register is a context problem, not a speaker problem
 

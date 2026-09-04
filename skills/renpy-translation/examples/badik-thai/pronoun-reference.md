@@ -1,5 +1,5 @@
 # Female Character Pronoun Reference
-# Being a DIK — EP1-EP6 Thai Translation
+# Being a DIK — Thai Translation (EP1–EP8, Season 3 in progress)
 # Updated 2026-06-02
 
 ---

@@ -1,4 +1,4 @@
-# Being a DIK — EP1 Character Profiles
+# Being a DIK — Character Profiles (EP1 baseline; extended through EP8 + Season 3)
 ## Translation Reference Guide (Thai)
 
 ---

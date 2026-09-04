@@ -10,7 +10,7 @@ A complete, battle-tested fan-translation workflow for Ren'Py visual novels, pac
 decompile → extract strings → build a game profile → translate → QA → build patch → deploy
 ```
 
-The pipeline was proven on a full Thai translation of *Being a DIK* Episode 1 (2,600+ strings, character-aware speech registers, runtime patch that coexists with mods like SanchoMod) and then generalized for any game and any target language.
+The pipeline was proven on a full Thai translation of *Being a DIK* — Episode 1 first (2,600+ strings), then carried through Episodes 1–8 (~36,000 strings, character-aware speech registers, an in-game phone-chat sub-patch, a runtime patch that coexists with mods like SanchoMod), with Season 3 in progress — and then generalized for any game and any target language.
 
 ## What you get
 
@@ -37,7 +37,7 @@ Because the dictionary is keyed on the game's own English text, the patch typica
 
 ## Worked example
 
-`skills/renpy-translation/examples/badik-thai/` is the real profile used to ship a Thai translation of *Being a DIK* EP1 (2,638 strings, 99.9% coverage): a 35-character speech-register profile, a Thai pronoun matrix by relationship, declarative QA rules that catch register violations mechanically, and a lessons-learned writeup. Copy its structure — not its content — when starting your own game.
+`skills/renpy-translation/examples/badik-thai/` is a trimmed copy of the real profile behind a Thai translation of *Being a DIK* — started on EP1 (2,638 strings, 99.9%) and since carried through Episodes 1–8 (~36,000 strings, 99%+), Season 3 ongoing: a 35-character speech-register profile, a Thai pronoun matrix by relationship, declarative QA rules that catch register violations mechanically, and a lessons-learned writeup. Copy its structure — not its content — when starting your own game.
 
 ## Install
 
