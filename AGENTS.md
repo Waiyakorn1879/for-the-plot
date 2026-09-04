@@ -35,7 +35,7 @@ python skills/renpy-translation/scripts/qa_check.py --profile profile.json --tec
 
 ## Hard rules
 
-1. **Token preservation is non-negotiable.** Every `[variable]`, `{tag}`, `\escape`, and `%%` in the source must appear in the translation, identical and in sensible order. A missing token crashes or corrupts rendering.
+1. **Token preservation is non-negotiable.** Every `[variable]`, `{tag}`, `\escape`, and `%%` in the source must appear in the translation, identical and in sensible order. A missing token crashes or corrupts rendering. Paired style tags (`{i}`, `{b}`, `{color}`…) must also keep their nesting — `{b}{i}x{/i}{/b}`, never `{b}{i}x{/b}{/i}` — a crossed close passes the count check but raises in Ren'Py (QA code `TAGNEST`).
 2. **Never modify game source files.** The patch lives entirely in its own folder and uninstalls by deleting it.
 3. **A translation identical to its source, or containing none of the target script, is not a translation.** It is never saved and never cached.
 4. **Never commit or publish game text** — scripts, extracted strings, translation dictionaries, archives, or commercial fonts. This repo is tools and style guides only.

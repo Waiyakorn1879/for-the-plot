@@ -15,9 +15,10 @@ Exit code is 1 while "hard" (non-review) issues remain — usable as a gate befo
 | `SCRIPT` | the translation contains no target-script characters |
 | `TAG:` / `VAR:` / `ESC:` | a `{tag}`, `[variable]`, or `\escape` the source has and the translation lost |
 | `TAG+:` / `VAR+:` / `ESC+:` | a token the translation **added or duplicated** — counts are compared, not sets |
+| `TAGNEST` | the translation closes a `{i}`/`{b}`/`{color}`… tag in a way the source did not — a mis-nested or unmatched `{/close}`. Ren'Py raises on this at runtime, and the tag *count* can still match, so `TAG:`/`TAG+:` miss it. Only fires when the source's own tags parse clean; an *unclosed* tag is not flagged (Ren'Py auto-closes it) |
 | `PCT:n->m` | the number of literal `%%` changed |
 
-`UNTRANSLATED` and `SCRIPT` come from the shared `validation.py` gate that `translate_api.py` also refuses to save on, so bulk output and hand-written translations are held to one standard. Sources whose only translatable content is a `keep_untranslated` term, a variable, a tag, or punctuation are exempt automatically — `"Maya!" → "Maya!"` is fine. For the residue that exemption doesn't cover (a line genuinely identical in both languages), list the exact source in `profile.json` → `validation.allow_identical`.
+`UNTRANSLATED`, `TAGNEST` and `SCRIPT` come from the shared `validation.py` gate that `translate_api.py` also refuses to save on, so bulk output and hand-written translations are held to one standard. Sources whose only translatable content is a `keep_untranslated` term, a variable, a tag, or punctuation are exempt automatically — `"Maya!" → "Maya!"` is fine. For the residue that exemption doesn't cover (a line genuinely identical in both languages), list the exact source in `profile.json` → `validation.allow_identical`.
 
 **`SCRIPT` is opt-in.** It only runs when `validation.target_script` is set explicitly (`"thai"`, `"greek"`, … or `{"ranges": ["0E00-0E7F"]}`). Without it, `qa_check.py` prints the script it *inferred* from `language_id` and leaves the check off, so upgrading the tooling can never turn on a new hard failure for an existing project. Latin-script targets can't use this check at all — they share codepoints with the source.
 
@@ -138,3 +139,12 @@ Budget for 5–15 of these over a full game. Their cost is proportional to how l
 Category 1 → fix immediately in the progress file (usually re-translate preserving tokens). Categories 2–3 → re-translate the flagged lines with the correct register; if a rule keeps firing on legitimate lines (e.g. quoting someone), refine the rule rather than ignoring the report — subject to the tuning rule above. Category 4 → human or assistant judgment, one pass near the end.
 
 **Forcing a re-translation:** deleting a key from `translations.json` is *not* enough. The Translation Memory resolves hits before batching and will silently restore the old translation with no model call. Run with `tm.enabled: false` in the profile to force real re-translation. (`translation_memory.py clean` does **not** help — it only drops empty and duplicate entries.) One exception: since v1.3.1 the TM validates entries on lookup too, so a cached translation that echoes its source or misses the target script is rejected and re-translated automatically.
+
+## What QA does not catch (by design)
+
+These are known limits, not bugs — a check that pretended to cover them would be worse than the honest gap. See ADR-021.
+
+- **Meaning.** The gates verify tokens, tag nesting, echo, target script, and declared register rules — all machine-checkable without a model. A fluent, well-formed *mistranslation* passes. Semantic review is a human pass (ADR-001); an LLM-judge QA stage is a v2.2 candidate.
+- **One English line, one rendering per game.** The runtime filter and the progress store are keyed on the source text, so the same English line cannot ship two different translations for two speakers/addressees in the same build. The Contextual TM and addressee resolution carry per-speaker/per-pair variants through the *prompt* and *cache*, not the patch. Occurrence-aware translation is v2.1.
+- **Runtime-built text.** `extract_strings.py` reads `.rpy` source; strings a game assembles in Python at runtime (phone UIs, social feeds) can bypass extraction entirely and need the wrapper-layer template in `references/custom-subsystems.md`.
+- **Unresolved addressees.** `relationships.py` resolves an addressee only from named evidence and reports everything else as unresolved *with a reason* (ADR-020). That is deliberate — a proximity guess produces a wrong pronoun on a line that looks fine. A relationship QA rule simply does not fire on an unresolved line.

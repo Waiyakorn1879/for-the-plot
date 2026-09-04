@@ -108,6 +108,28 @@ class TestFullRun:
         assert "[MISSING]" in report
 
 
+class TestTagNesting:
+    def test_mismatched_close_is_a_hard_issue(self, tmp_path):
+        # Same tag multiset as the source, so TAG count checks pass; the
+        # translation crosses the nesting.
+        strings = [say("{i}a{/i} {b}b{/b}", "mc", 1)]
+        proc = run_qa(tmp_path, strings, {"{i}a{/i} {b}b{/b}": "{i}α {b}β{/i} {/b}"})
+        assert proc.returncode == 1
+        assert "[TAGNEST]" in proc.stdout
+
+    def test_faithfully_copied_broken_source_not_flagged(self, tmp_path):
+        strings = [say("{i}a {b}b{/i} {/b}", "mc", 1)]
+        proc = run_qa(tmp_path, strings, {"{i}a {b}b{/i} {/b}": "{i}α {b}β{/i} {/b}"})
+        assert "[TAGNEST]" not in proc.stdout
+
+    def test_unclosed_translation_is_not_a_nesting_error(self, tmp_path):
+        # Dropping {/i} is a TAG-count issue, not a TAGNEST one (Ren'Py
+        # auto-closes an unclosed tag; it raises on a mismatched close).
+        strings = [say("{i}whispered{/i}", "mc", 1)]
+        proc = run_qa(tmp_path, strings, {"{i}whispered{/i}": "{i}ψιθύρισε"})
+        assert "[TAGNEST]" not in proc.stdout
+
+
 GREEK = {"validation": {"target_script": "greek"}}
 
 

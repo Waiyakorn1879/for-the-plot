@@ -4,6 +4,9 @@ Built-in technical checks (category 1 — always run, language-agnostic):
   - MISSING: source string has no translation
   - TAG: {tags} present in source but absent in translation
   - VAR: [variables] present in source but absent in translation
+  - TAGNEST: translation closes a {i}/{b}/{color}... tag that the source did
+    not — a mis-nested close renders wrong or raises in Ren'Py even when the
+    tag COUNT still matches (checked via validation.tag_nesting_ok)
 
 Built-in review checks (category 4 — language-agnostic, skipped by --technical-only):
   - roman: untranslated Latin-script words in the translation

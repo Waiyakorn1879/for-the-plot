@@ -5,8 +5,8 @@ import pytest
 import validation
 from validation import (
     is_echo, multiset_diff, parse_ranges, policy_banner, resolve_target_script,
-    translatable_residue, validate_translation, validation_policy,
-    write_text_atomic,
+    tag_nesting_ok, translatable_residue, validate_translation,
+    validation_policy, write_text_atomic,
 )
 
 THAI = [(0x0E00, 0x0E7F)]
@@ -152,6 +152,55 @@ class TestValidateTranslation:
         assert validate_translation(src, src, self.THAI_POLICY)[1] == "ECHO"
         p = dict(self.THAI_POLICY, allow_identical={src})
         assert validate_translation(src, src, p) == (True, None)
+
+
+class TestTagNesting:
+    def test_well_formed(self):
+        assert tag_nesting_ok("{i}soft{/i} and {b}loud{/b}")
+        assert tag_nesting_ok("{b}{i}both{/i}{/b}")
+        assert tag_nesting_ok("plain text, no tags")
+
+    def test_unclosed_is_tolerated(self):
+        # Ren'Py auto-closes at end of string — NOT a failure.
+        assert tag_nesting_ok("{i}whispered")
+        assert tag_nesting_ok("{b}{i}still open")
+
+    def test_mismatched_close_fails(self):
+        # Same tag multiset as "{i}a{/i} {b}b{/b}", but crosses the nesting.
+        assert not tag_nesting_ok("{i}a {b}b{/i} {/b}")
+
+    def test_close_without_open_fails(self):
+        assert not tag_nesting_ok("done{/i}")
+
+    def test_standalone_and_unknown_tags_ignored(self):
+        assert tag_nesting_ok("wait{w=0.5}{p}now{nw}")
+        assert tag_nesting_ok("{unknown}x{/unknown}")
+
+    def test_tag_with_argument(self):
+        assert tag_nesting_ok("{color=#ff0000}red{/color}")
+        assert not tag_nesting_ok("{color=#ff0000}{size=30}x{/color}{/size}")
+
+    def test_escaped_braces_are_not_tags(self):
+        assert tag_nesting_ok("use {{i}} for italics")
+
+
+class TestValidateTranslationNesting:
+    P = {"echo_check": True, "script_check": False, "script_ranges": [],
+         "min_script_chars": 1, "allow_identical": set(), "keep_untranslated": []}
+
+    def test_regression_flagged(self):
+        assert validate_translation("{i}a{/i} {b}b{/b}", "{i}ก {b}ข{/i} {/b}",
+                                    self.P) == (False, "TAGNEST")
+
+    def test_faithfully_copied_broken_source_not_flagged(self):
+        # Source itself is mis-nested; a copy of it is not the translator's bug.
+        ok, code = validate_translation("{i}a {b}b{/i} {/b}",
+                                        "{i}ก {b}ข{/i} {/b}", self.P)
+        assert code != "TAGNEST"
+
+    def test_checked_even_when_residue_empty(self):
+        p = dict(self.P, keep_untranslated=["Maya"])
+        assert validate_translation("{i}Maya{/i}", "{i}เมยา{/b}", p) == (False, "TAGNEST")
 
 
 class TestMultisetDiff:

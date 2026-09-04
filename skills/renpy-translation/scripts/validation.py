@@ -45,6 +45,51 @@ PCT_RE = re.compile(r"%%")                  # literal percent in a % format stri
 # Everything that carries no translatable content on its own.
 _VAR_TAG_RE = re.compile(r"\[[^\]]+\]|\{[^}]+\}")
 
+# Ren'Py text tags that take a matching {/close}. Everything else — {w}, {p},
+# {nw}, {fast}, {clear}, {image=...}, {space=N}, {a=...} link targets and any
+# unknown tag — is treated as standalone and ignored by the nesting check.
+# Ren'Py TOLERATES an unclosed paired tag (it auto-closes at end of string);
+# what it rejects at runtime is a {/close} that does not match the innermost
+# open tag. A token-count check cannot see that: the multiset is unchanged.
+PAIRED_TAGS = frozenset({
+    "a", "alpha", "alt", "b", "color", "cps", "font", "i", "k",
+    "noalt", "outlinecolor", "plain", "rb", "rt", "s", "size", "u",
+})
+
+
+def _tag_name(token):
+    """('i', False) from '{i}', ('color', False) from '{color=#fff}',
+    ('i', True) from '{/i}'. Returns ('', close) for '{}' / '{ }'."""
+    inner = token[1:-1].strip()
+    close = inner.startswith("/")
+    if close:
+        inner = inner[1:].strip()
+    parts = inner.replace("=", " ").split()
+    return (parts[0].lower() if parts else ""), close
+
+
+def tag_nesting_ok(text):
+    """False when a {/close} text tag does not match the innermost open tag.
+
+    Regression-only signal: callers compare source against translation, so a
+    faithfully copied broken source is never flagged. Unclosed paired tags are
+    NOT a failure (Ren'Py auto-closes them); a mis-nested or unmatched close
+    IS (Ren'Py raises), and it survives token parity because the tag multiset
+    is identical — "{i}a{/i} {b}b{/b}" vs "{i}a {b}b{/i} {/b}".
+    """
+    stack = []
+    for token in TAG_RE.findall(text.replace("{{", "").replace("}}", "")):
+        name, close = _tag_name(token)
+        if name not in PAIRED_TAGS:
+            continue
+        if close:
+            if not stack or stack[-1] != name:
+                return False
+            stack.pop()
+        else:
+            stack.append(name)
+    return True
+
 
 # ---- script ranges ------------------------------------------------------
 # Codepoint ranges that count as "the target script wrote something here".
@@ -208,13 +253,19 @@ def has_target_script(text, ranges, minimum=1):
 
 
 def validate_translation(source, translation, policy):
-    """-> (ok, code) with code in EMPTY / ECHO / SCRIPT / None.
+    """-> (ok, code) with code in EMPTY / TAGNEST / ECHO / SCRIPT / None.
 
-    Gate order: empty -> residue -> allow_identical -> echo -> script.
-    The residue gate is what lets "Maya", "...", and "[points]" through.
+    Gate order: empty -> nesting -> residue -> allow_identical -> echo -> script.
+    The residue gate is what lets "Maya", "...", and "[points]" through; the
+    nesting gate runs BEFORE it because a mis-nested tag crashes rendering
+    whether or not there was anything to translate ("{i}Maya{/i}" with Maya
+    kept has empty residue but still must not lose its tag structure).
     """
     if translation is None or not translation.strip():
         return False, "EMPTY"
+
+    if tag_nesting_ok(source) and not tag_nesting_ok(translation):
+        return False, "TAGNEST"
 
     if not translatable_residue(source, policy.get("keep_untranslated", ())):
         return True, None
@@ -235,6 +286,7 @@ def validate_translation(source, translation, policy):
 
 REASONS = {
     "EMPTY": "returned an empty translation",
+    "TAGNEST": "produced a mismatched Ren'Py close tag",
     "ECHO": "returned the source text untranslated",
     "SCRIPT": "did not write in the target script",
 }
