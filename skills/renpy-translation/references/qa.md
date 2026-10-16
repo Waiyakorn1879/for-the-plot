@@ -148,3 +148,12 @@ These are known limits, not bugs — a check that pretended to cover them would 
 - **One English line, one rendering per game.** The runtime filter and the progress store are keyed on the source text, so the same English line cannot ship two different translations for two speakers/addressees in the same build. The Contextual TM and addressee resolution carry per-speaker/per-pair variants through the *prompt* and *cache*, not the patch. Occurrence-aware translation is v2.1.
 - **Runtime-built text.** `extract_strings.py` reads `.rpy` source; strings a game assembles in Python at runtime (phone UIs, social feeds) can bypass extraction entirely and need the wrapper-layer template in `references/custom-subsystems.md`.
 - **Unresolved addressees.** `relationships.py` resolves an addressee only from named evidence and reports everything else as unresolved *with a reason* (ADR-020). That is deliberate — a proximity guess produces a wrong pronoun on a line that looks fine. A relationship QA rule simply does not fire on an unresolved line.
+
+## Gender-marked speech (Thai)
+
+When `language_id` is `thai`, the prompt and QA both know the gender grammar (`GENDER_GRAMMAR` in `characters.py`):
+
+- **male** speakers must not use `ค่ะ` / `คะ` / `นะคะ` / `ดิฉัน`; **female** speakers must not use `ครับ`. (`คะ` only matches as a particle, so `คะแนน` is safe.)
+- **unknown gender, minor extras** (role contains `extra`/`background`/`minor`/`crowd`) **and speakers with no record** must stay unisex — none of the above. These are category-2 findings (`Name: unisex speech`, `unknown speaker: gendered speech`).
+- A text spoken by several characters (`also_spoken_by` in `strings.json`) is translated once, so the prompt marks it `shared_by` and asks for a unisex rendering when their genders differ; QA checks it against every speaker.
+- Opt a character out (e.g. a woman who speaks with `ครับ` on purpose) with `"gender_grammar": false` on the record.

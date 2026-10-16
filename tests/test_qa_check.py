@@ -495,3 +495,59 @@ class TestV14ReportIsUnchanged:
                       None, {"speakers": speakers})
         assert proc.returncode == 0
         assert "Cat 3:    0" in proc.stdout
+
+
+def test_shared_text_judged_against_every_speaker(tmp_path):
+    """Dedupe keeps the first speaker; a rule aimed at another speaker of the
+    same text must still fire."""
+    entry = say("Hi!", "mc", 1)
+    entry["also_spoken_by"] = ["amy"]
+    rules = {"groups": {}, "rules": [
+        {"name": "male ending on amy", "category": 2, "speakers": ["amy"],
+         "pattern": "ΚΡΑΤΑ"}]}
+    proc = run_qa(tmp_path, [entry], {"Hi!": "γεια ΚΡΑΤΑ"}, qa_rules=rules)
+    assert "male ending on amy" in proc.stdout
+
+
+THAI_SPEAKERS = {
+    "mc": {"name": "Max", "gender": "male"},
+    "an": {"name": "Annie", "gender": "female"},
+    "bg": {"name": "Waiter", "gender": "male", "role": "background extra"},
+}
+
+
+def thai_qa(tmp_path, rows):
+    strings = [say(t, spk, i + 1) for i, (spk, t, _) in enumerate(rows)]
+    return run_qa(tmp_path, strings, {t: tr for _, t, tr in rows},
+                  profile_extra={"language_id": "thai", "language_name": "Thai",
+                                 "speakers": THAI_SPEAKERS})
+
+
+def test_thai_gender_particles_enforced(tmp_path):
+    proc = thai_qa(tmp_path, [
+        ("mc", "Thanks.", "ขอบคุณครับ"),          # ok
+        ("an", "Thanks.2", "ขอบคุณค่ะ"),           # ok
+        ("an", "Hi!", "สวัสดีครับ!"),              # female using ครับ
+        ("mc", "Score?", "คะแนนเท่าไหร่ครับ"),     # คะแนน must not trip the คะ rule
+        ("mc", "Yes?", "ใช่คะ?"),                  # male using คะ
+        ("bg", "Welcome.", "ยินดีต้อนรับครับ"),     # extra -> unisex required
+        ("zz", "Who?", "ใครค่ะ"),                  # unknown speaker -> unisex required
+        ("zz", "Hm.", "อืม นะ"),                   # unisex ok
+    ])
+    assert proc.returncode == 1
+    out = proc.stdout
+    assert "Annie: female speech" in out and "Max: male speech" in out
+    assert "Waiter: unisex speech" in out and "unknown speaker: gendered speech" in out
+    assert out.count("Score?") == 0 and "Thanks." not in out.split("CAT 2")[1].split("CAT 3")[0]
+
+
+def test_thai_shared_text_neutral_for_mixed_genders(tmp_path):
+    entry = say("Hi!", "an", 1)
+    entry["also_spoken_by"] = ["mc"]
+    for tr in ("สวัสดีค่ะ", "สวัสดีครับ"):          # either gendered form fails someone
+        proc = run_qa(tmp_path, [entry], {"Hi!": tr},
+                      profile_extra={"language_id": "thai", "speakers": THAI_SPEAKERS})
+        assert proc.returncode == 1
+    proc = run_qa(tmp_path, [entry], {"Hi!": "สวัสดี!"},
+                  profile_extra={"language_id": "thai", "speakers": THAI_SPEAKERS})
+    assert "speech" not in proc.stdout.split("CAT 2")[1].split("CAT 3")[0]

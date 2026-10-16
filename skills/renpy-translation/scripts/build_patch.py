@@ -102,15 +102,37 @@ def build_filter_rpy(profile):
 #   - Press {toggle_key.replace("K_", "")} anytime to toggle {lang_name} <-> original language
 
 init -1 python:
+    import sys
     _{ident}_translations = {{}}
+    _{ident}_speaker_translations = {{}}
     _{ident}_filter_calls = [0]
     _{ident}_filter_hits = [0]
     _{ident}_last_miss = [""]
+
+    def _{ident}_get_speaker():
+        try:
+            f = sys._getframe(1)
+            for _ in range(5):
+                if f is None:
+                    break
+                loc = f.f_locals
+                if 'self' in loc:
+                    s = loc['self']
+                    if hasattr(s, 'who'):
+                        return getattr(s, 'who', None)
+                f = f.f_back
+        except Exception:
+            pass
+        return None
 
     def _{ident}_say_filter(text):
         _{ident}_filter_calls[0] += 1
         try:
             if renpy.game.preferences.language == "{lang}":
+                spk = _{ident}_get_speaker()
+                if spk and (spk, text) in _{ident}_speaker_translations:
+                    _{ident}_filter_hits[0] += 1
+                    return _{ident}_speaker_translations[(spk, text)]
                 if text in _{ident}_translations:
                     _{ident}_filter_hits[0] += 1
                     return _{ident}_translations[text]
@@ -271,7 +293,7 @@ init 2001 python:
     return "".join(parts)
 
 
-def build_dict_rpy(translations, ident, lang_name, chunk=None):
+def build_dict_rpy(translations, ident, lang_name, chunk=None, speaker_translations=None):
     """Yield (filename_suffix, content) for one or more dict files."""
     items = list(translations.items())
     if not chunk or chunk <= 0:
@@ -289,6 +311,14 @@ def build_dict_rpy(translations, ident, lang_name, chunk=None):
         for eng, tr in part:
             lines.append(f"        {py2_unicode_repr(eng)}: {py2_unicode_repr(tr)},\n")
         lines.append("    })\n")
+
+        # In the first dict file, append character-specific translation overrides if present
+        if fi == 0 and speaker_translations:
+            lines.append(f"\n    _{ident}_speaker_translations.update({{\n")
+            for (spk, eng), tr in speaker_translations.items():
+                lines.append(f"        ({py2_unicode_repr(spk)}, {py2_unicode_repr(eng)}): {py2_unicode_repr(tr)},\n")
+            lines.append("    })\n")
+
         yield fi, "".join(lines)
 
 
@@ -347,7 +377,18 @@ def main():
     write_text_atomic(filter_path, build_filter_rpy(profile))
     print(f"Wrote {filter_path}")
 
-    for fi, content in build_dict_rpy(dict_translations, ident, lang_name, args.split_size):
+    # Load character-specific translation overrides if speaker_translations.json exists
+    speaker_path = base / profile.get("speaker_translations_file", "speaker_translations.json")
+    speaker_translations = {}
+    if speaker_path.is_file():
+        spk_raw = json.loads(speaker_path.read_text(encoding="utf-8"))
+        for k, v in spk_raw.items():
+            if "::" in k:
+                spk, eng = k.split("::", 1)
+                speaker_translations[(spk, eng)] = v
+        print(f"Loaded {len(speaker_translations)} character-specific overrides from {speaker_path.name}")
+
+    for fi, content in build_dict_rpy(dict_translations, ident, lang_name, args.split_size, speaker_translations):
         dict_path = out_dir / f"{fi + 1:02d}_{ident}_dict.rpy"
         write_text_atomic(dict_path, content)
         print(f"Wrote {dict_path}")

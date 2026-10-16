@@ -202,7 +202,60 @@ def cast_block(speakers, codes, max_examples=2):
     return "CAST IN THIS BATCH:\n" + "\n".join(cards)
 
 
-def register_rules(speakers):
+# Gender-marked speech, keyed by language id. Languages that inflect the
+# speaker's own words by the speaker's gender (Thai particles/pronouns) need the
+# gender in the prompt AND in QA: a well-formed line with the wrong particle
+# passes every other check. A speaker of unknown gender, or a minor extra, gets
+# the NEUTRAL form instead of a guess. `avoid_*` are literal QA patterns; they
+# stay literal for the reason register_rules explains (no clever exclusions).
+GENDER_GRAMMAR = {
+    "thai": {
+        "rule": (
+            "GENDER-MARKED SPEECH (Thai): the speaker label gives each speaker's gender.\n"
+            "- male speaker: ครับ / นะครับ, self-pronoun ผม (or the persona card's own choice).\n"
+            "- female speaker: ค่ะ (statements) / คะ (questions) / นะคะ, self-pronoun per the persona card.\n"
+            "- unknown gender, or a minor background extra: stay UNISEX. Do NOT use ครับ/ค่ะ/คะ/นะคะ/ผม/ดิฉัน; "
+            "use no particle, or neutral ones (นะ, สิ, เลย, หรอ, อะ) and เรา or no pronoun.\n"
+            "- a line marked \"shared_by\" is spoken by several characters: write it unisex so it is "
+            "correct for all of them.\n"
+            "- A persona card's own pronoun/particle choice overrides the defaults above."),
+        "avoid_for_male": r"ค่ะ|ดิฉัน|คะ(?=$|[\s!?.,…~\"')\]}”’])",
+        "avoid_for_female": r"ครับ",
+    },
+}
+
+_NEUTRAL_ROLES = ("extra", "background", "minor", "crowd")
+
+
+def speech_gender(speakers, code):
+    """'male' / 'female' for a speaker whose gender is known and who matters;
+    None for unknown gender or a minor extra (they get unisex speech);
+    'skip' when the record opts out with `"gender_grammar": false`."""
+    record = get_record(speakers, code)
+    if record.get("gender_grammar") is False:
+        return "skip"
+    role = str(record.get("role", "")).lower()
+    if any(r in role for r in _NEUTRAL_ROLES):
+        return None
+    gender = str(record.get("gender", "")).strip().lower()
+    if gender in ("male", "m", "man"):
+        return "male"
+    if gender in ("female", "f", "woman"):
+        return "female"
+    return None
+
+
+def gender_grammar(language):
+    return GENDER_GRAMMAR.get(str(language or "").lower())
+
+
+def avoid_pattern(grammar, gender):
+    """Regex of the forms a speaker of this gender (None = unisex) must not use."""
+    male, female = grammar["avoid_for_male"], grammar["avoid_for_female"]
+    return {"male": male, "female": female}.get(gender) or f"{male}|{female}"
+
+
+def register_rules(speakers, language=None):
     """Character records -> qa_check rules, so the gate checks what the
     prompt asked for.
 
@@ -239,6 +292,17 @@ def register_rules(speakers):
                 "category": 2,
                 "speakers": codes,
                 "pattern": pattern(forbidden),
+                "_from_character": True,
+            })
+
+        grammar = gender_grammar(language)
+        if grammar and speech_gender(speakers, code) != "skip":
+            gender = speech_gender(speakers, code)
+            rules.append({
+                "name": f"{name}: {gender or 'unisex'} speech",
+                "category": 2,
+                "speakers": codes,
+                "pattern": avoid_pattern(grammar, gender),
                 "_from_character": True,
             })
 

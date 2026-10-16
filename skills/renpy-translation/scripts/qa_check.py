@@ -35,6 +35,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from characters import (
+    gender_grammar, avoid_pattern, get_record, is_character,
     is_monologue, missing_must_use, register_rules, resolve_alias,
 )
 from relationships import build_resolver
@@ -173,7 +174,14 @@ def main():
     # Character-derived rules first, so a hand-written rule of the same name in
     # qa_rules.json shadows the generated one rather than duplicating it.
     speakers = profile.get("speakers", {})
-    generated = register_rules(speakers)
+    language = profile.get("language_id")
+    generated = register_rules(speakers, language)
+    grammar = gender_grammar(language)
+    if grammar:
+        # Speakers with no record at all are unknown: unisex speech, like extras.
+        generated.append({
+            "name": "unknown speaker: gendered speech", "category": 2,
+            "pattern": avoid_pattern(grammar, None), "unknown_speakers": True})
     authored = qa_conf.get("rules", [])
     authored_names = {r.get("name") for r in authored}
     rules = [r for r in generated if r["name"] not in authored_names] + authored
@@ -241,10 +249,17 @@ def main():
             continue
 
         # ── Declarative register/phrasing rules ────────────────────────────
-        for rule in rules:
-            if rule["_speakers"] is not None and canon_speaker not in rule["_speakers"]:
+        # A deduplicated text shared by several speakers is judged against each.
+        judged = [(canon_speaker, target)] + [
+            (canon(speakers, o), None) for o in s.get("also_spoken_by", [])]
+        for rule, (rule_spk, rule_tgt) in ((r, j) for r in rules for j in judged):
+            if rule["_speakers"] is not None and rule_spk not in rule["_speakers"]:
                 continue
-            if rule["_to"] is not None and (target is None or target not in rule["_to"]):
+            if rule.get("unknown_speakers") and (
+                    s["kind"] != "say" or not is_character(speakers, rule_spk)
+                    or get_record(speakers, rule_spk)):
+                continue
+            if rule["_to"] is not None and (rule_tgt is None or rule_tgt not in rule["_to"]):
                 continue
             if rule.get("skip_monologue") and is_monologue(text):
                 continue
@@ -258,7 +273,7 @@ def main():
                 if key in rule.setdefault("_seen", set()):
                     continue
                 rule["_seen"].add(key)
-            categories[cat].append((rule["name"], speaker, file, line, text, tr))
+            categories[cat].append((rule["name"], speaker if rule_spk == canon_speaker else rule_spk, file, line, text, tr))
 
         # ── Category 4 built-ins: phrasing review flags ────────────────────
         # An echoed line is 100% Latin by definition; reporting it again as a

@@ -154,3 +154,48 @@ class TestScreensMode:
         plain = extract_strings.extract(FIXTURES / "mini_game.rpy")
         flagged = extract_strings.extract(FIXTURES / "mini_game.rpy", screens=True)
         assert plain == flagged
+
+
+class TestSayGrammar:
+    """A say line that matches no pattern is never extracted — and QA never
+    learns its speaker (the `a "Hi!" with dissolve` regression)."""
+
+    SRC = (
+        'label start:\n'
+        '    a "Hi!" with dissolve\n'
+        '    a happy "Attrs line."\n'
+        '    a happy "Attrs and trailer." (what_size=20) nointeract with fade\n'
+        '    "Narrated." with dissolve\n'
+        '    play sound "boom.ogg"\n'
+        '    e = Character("Eileen")\n'
+        '    a "Broken" garbage here\n'
+    )
+
+    def run(self, tmp_path):
+        f = tmp_path / "s.rpy"
+        f.write_text(self.SRC, encoding="utf-8")
+        suspects = []
+        return extract_strings.extract(f, suspects=suspects), suspects
+
+    def test_trailers_and_attributes_extracted(self, tmp_path):
+        entries, _ = self.run(tmp_path)
+        got = {(e["speaker"], e["text"]) for e in entries}
+        assert ("a", "Hi!") in got
+        assert ("a", "Attrs line.") in got
+        assert ("a", "Attrs and trailer.") in got
+        assert ("narrator", "Narrated.") in got
+        assert not any(t == "boom.ogg" for _, t in got)
+
+    def test_unmatched_dialogue_shape_is_reported(self, tmp_path):
+        _, suspects = self.run(tmp_path)
+        assert [s[2] for s in suspects] == ['a "Broken" garbage here']
+
+    def test_shared_text_records_all_speakers(self, tmp_path):
+        (tmp_path / "s.rpy").write_text(
+            'label x:\n    a "Hi!"\n    b "Hi!"\n', encoding="utf-8")
+        out = tmp_path / "o.json"
+        subprocess.run([sys.executable, str(SCRIPTS_DIR / "extract_strings.py"),
+                        "--src", str(tmp_path), "--out", str(out)],
+                       check=True, capture_output=True, text=True)
+        (e,) = json.loads(out.read_text(encoding="utf-8"))
+        assert e["speaker"] == "a" and e["also_spoken_by"] == ["b"]

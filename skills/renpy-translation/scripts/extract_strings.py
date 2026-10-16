@@ -33,14 +33,17 @@ from validation import configure_console, write_text_atomic
 
 configure_console()
 
-# Match: `speaker "text"` or `speaker "text" (with stuff)` etc.
-# Allows escaped quotes inside.
+# Ren'Py say statement: `who [attrs] "text" [(args)] [nointeract] [id x] [with trans]`.
+# Every trailer is optional and may repeat in any order; a line that silently
+# fails to match here is never extracted, so QA never sees its speaker (the
+# "a \"Hi!\" with dissolve" bug). Allows escaped quotes inside the text.
+_SAY_TRAILER = r'(?:\s*\([^)]*\)|\s+nointeract|\s+id\s+\w+|\s+with\s+[^:"\n]+?)*'
 SAY_RE = re.compile(
-    r'^(\s*)([a-zA-Z_][\w]*)\s+"((?:[^"\\]|\\.)*)"\s*(?:\([^)]*\))?\s*$'
+    r'^(\s*)([a-zA-Z_]\w*)((?:\s+[\w@.]+)*)\s+"((?:[^"\\]|\\.)*)"' + _SAY_TRAILER + r'\s*$'
 )
-# Narrator-only say: just `"text"`
+# Narrator-only say: just `"text"` (optionally with a transition)
 NARRATOR_RE = re.compile(
-    r'^(\s*)"((?:[^"\\]|\\.)*)"\s*$'
+    r'^(\s*)"((?:[^"\\]|\\.)*)"' + _SAY_TRAILER + r'\s*$'
 )
 # Menu choice: `    "Choice text" if cond:` or `    "Choice text":`
 MENU_RE = re.compile(
@@ -79,10 +82,16 @@ NON_SPEAKERS = {
     "else", "while", "for", "with", "window", "image", "screen",
     "init", "define", "default", "transform", "python", "translate",
     "voice", "nvl", "centered", "extend", "style", "$",
+    "camera", "use", "add",
 }
 
+# Text before the first quote of a say-shaped line: `who [attrs]` or nothing.
+_SAY_PREFIX_RE = re.compile(r'^\s*(?:[\w@.]+(?:\s+[\w@.]+)*)?\s*$')
 
-def extract(rpy_path: Path, screens=False):
+
+def extract(rpy_path: Path, screens=False, suspects=None):
+    """`suspects`, if a list, collects (file, line, text) for lines shaped like
+    dialogue that no pattern accepted — the extractor's blind spots."""
     out = []
     in_python_block = False
     python_indent = None
@@ -167,7 +176,7 @@ def extract(rpy_path: Path, screens=False):
             m = SAY_RE.match(line)
             if m:
                 speaker = m.group(2)
-                txt = m.group(3)
+                txt = m.group(4)
                 if speaker in NON_SPEAKERS:
                     pass  # fall through to narrator/menu checks
                 else:
@@ -196,6 +205,11 @@ def extract(rpy_path: Path, screens=False):
                                 "file": rpy_path.name, "line": lineno, "kind": "narrator",
                                 "label": label})
                 continue
+
+            if suspects is not None and '"' in stripped:
+                first = stripped.split()[0]
+                if first not in NON_SPEAKERS and _SAY_PREFIX_RE.match(line.split('"', 1)[0]):
+                    suspects.append((rpy_path.name, lineno, stripped))
     return stamp_label_cast(out)
 
 
@@ -259,8 +273,9 @@ def main():
         sys.exit(f"source dir not found: {src}")
 
     all_entries = []
+    suspects = []
     for rpy in sorted(src.glob("*.rpy")):
-        entries = extract(rpy, screens=args.screens)
+        entries = extract(rpy, screens=args.screens, suspects=suspects)
         print(f"{rpy.name}: {len(entries)} strings")
         all_entries.extend(entries)
 
@@ -271,10 +286,25 @@ def main():
         # Deduplicate by text but keep first occurrence for context
         seen = {}
         for e in all_entries:
-            if e["text"] not in seen:
-                seen[e["text"]] = e
+            first = seen.setdefault(e["text"], e)
+            # One shared translation serves every speaker of this text, so QA
+            # must judge it against all of them, not just the first.
+            if e["kind"] == "say" and e["speaker"] != first["speaker"]:
+                also = first.setdefault("also_spoken_by", [])
+                if e["speaker"] not in also:
+                    also.append(e["speaker"])
         result = list(seen.values())
+        shared = sum(1 for e in result if e.get("also_spoken_by"))
+        if shared:
+            print(f"note: {shared} text(s) are spoken by more than one character "
+                  "(see also_spoken_by); one translation must fit all of them")
         print(f"\nTotal: {len(all_entries)} occurrences, {len(result)} unique strings")
+
+    if suspects:
+        print(f"\nWARNING: {len(suspects)} dialogue-shaped line(s) matched no pattern "
+              "and were NOT extracted:")
+        for f, ln, t in suspects[:10]:
+            print(f"  {f}:{ln}: {t[:100]}")
 
     write_text_atomic(out, json.dumps(result, ensure_ascii=False, indent=2))
     print(f"Wrote {out}")

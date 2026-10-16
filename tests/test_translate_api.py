@@ -671,3 +671,16 @@ class TestAddresseeReachesTheMemory:
         entries = self._run(tmp_path, monkeypatch, profile)
         variant = entries["You."]["variants"][0]
         assert (variant["speaker"], variant["target"]) == ("mc", None)
+
+
+def test_thai_prompt_carries_gender_rule_and_shared_by():
+    import translate_api as t
+    from pathlib import Path
+    thai = t.build_system_instruction({"language_id": "thai"}, Path("."))
+    assert "GENDER-MARKED SPEECH" in thai
+    assert "GENDER-MARKED" not in t.build_system_instruction({"language_id": "greek"}, Path("."))
+    speakers = {"mc": {"name": "Max", "gender": "male"}, "an": {"name": "Annie", "gender": "female"}}
+    seen = {}
+    t.translate_batch(lambda s, u: seen.setdefault("u", u) and "[]", thai, speakers, "Thai",
+                      [{"id": 1, "speaker": "an", "also_spoken_by": ["mc"], "kind": "say", "text": "Hi!"}])
+    assert '"shared_by": "Annie (female), Max (male)"' in seen["u"]
