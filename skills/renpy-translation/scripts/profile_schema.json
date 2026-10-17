@@ -170,6 +170,10 @@
       "type": "string",
       "description": "Declarative register/phrasing rules for qa_check.py. See references/qa.md."
     },
+    "terminology_file": {
+      "type": "string",
+      "description": "Terminology dictionary JSON (default terminology.json). keep_untranslated migrates into it as APPROVED keep terms; see references/terminology.md"
+    },
     "nameplates_file": {
       "type": "string",
       "description": "JSON {speaker name: translated name}; translates say-box names"

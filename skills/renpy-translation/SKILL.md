@@ -44,7 +44,7 @@ Two ways to deliver a translation; choose before extracting:
 
 ## Game profile and character records
 
-Every game/language pair gets a **profile**: a `profile.json` (machine config: characters, glossary, fonts, paths, validation) plus a `translation-guide.md` (style guide: registers, formality, slang policy, few-shot examples). All pipeline scripts take `--profile profile.json`.
+Every game/language pair gets a **profile**: a `profile.json` (machine config: characters, glossary, fonts, paths, validation) plus a `translation-guide.md` (style guide: registers, formality, slang policy, few-shot examples). All pipeline scripts take `--profile profile.json`. For recurring names, places and jargon, seed and curate a **terminology dictionary** (`terminology.py sweep` / `promote` / `preflight`; see `references/terminology.md`) before batch 1.
 
 `profile.json` → `speakers` **is the character dictionary.** Beyond `name`/`gender`/`role`, a record can declare `register`, `self_pronoun`/`address_pronoun`, `forbidden`, `must_use`, `speech_notes`, `examples`, a `monologue` override for `(...)` inner thoughts, and a **`to` map of per-relationship overrides**. That last one matters most in register-rich languages, where the pronoun is a property of the *pair*, not the person — the same protagonist uses one pronoun with a close friend and another with an authority figure.
 

@@ -28,7 +28,7 @@ Every section is tagged. Know which rules you inherit and which you must rebuild
 | 0 | Init | **[PORTABLE]** | `scripts/init_project.py` |
 | 1 | Decompile | **[RE-DERIVE]** | `references/decompiling.md` |
 | 2 | Extract | **[RE-DERIVE]** (output shape is [PORTABLE]) | `references/extraction.md`, `references/engine-seam.md` |
-| 3 | Profile | **[PORTABLE]** structure, **[ADAPT]** content | `references/game-profile.md` |
+| 3 | Profile | **[PORTABLE]** structure, **[ADAPT]** content | `references/game-profile.md`, `references/terminology.md` |
 | 4 | Translate | **[PORTABLE]** | `references/translating.md` |
 | 5 | QA | **[PORTABLE]** method, **[ADAPT]** rules | `references/qa.md` |
 | 6 | Patch | **[RE-DERIVE]** | `references/patching.md` |

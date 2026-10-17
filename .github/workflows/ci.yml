@@ -58,6 +58,12 @@ jobs:
           sys.path.insert(0, "skills/renpy-translation/scripts")
           import relationships
           assert relationships.TIERS == ("dyad", "vocative", "declared")
+          # v1.6: terminology lifecycle. Adding or reordering a stage changes what
+          # may hard-fail a build - it must be a deliberate edit, not a drift.
+          import terminology
+          assert terminology.STAGES == ("DISCOVERED", "CANDIDATE", "REVIEWED",
+                                        "APPROVED", "ENFORCED")
+          assert schema["properties"]["terminology_file"]
           print("manifests OK")
           EOF
 

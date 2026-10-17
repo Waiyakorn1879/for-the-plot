@@ -98,9 +98,9 @@ def cmd_todo(args):
               "only check tokens and validity, not the speaker's gender form")
 
 
-def check(source, tr, gender, profile, grammar):
+def check(source, tr, gender, profile, grammar, base=None):
     """-> None if `tr` is acceptable for a speaker of `gender`, else a reason."""
-    ok, code = validate_translation(source, tr, validation_policy(profile))
+    ok, code = validate_translation(source, tr, validation_policy(profile, base))
     if not ok:
         return code
     for label, rx in (("TAG", TAG_RE), ("VAR", VAR_RE), ("ESC", ESC_RE)):
@@ -127,7 +127,7 @@ def cmd_merge(args):
             rejected["not a needed (speaker, text)"] += 1
             continue
         text, gender = wanted[key]
-        reason = check(text, tr, gender, profile, grammar)
+        reason = check(text, tr, gender, profile, grammar, out_path.parent)
         if reason:
             rejected[reason] += 1
             print(f"  rejected {key[:60]!r}: {reason}")

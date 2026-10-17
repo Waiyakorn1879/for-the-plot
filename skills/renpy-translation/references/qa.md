@@ -13,6 +13,7 @@ Exit code is 1 while "hard" (non-review) issues remain — usable as a gate befo
 | `MISSING` | no translation, or an empty one |
 | `UNTRANSLATED` | the translation is the source text back again |
 | `SCRIPT` | the translation contains no target-script characters |
+| `TERM:missing:` / `TERM:forbidden:` | an ENFORCED terminology term (v1.6) lacks its canonical rendering or contains a forbidden one; see `terminology.md` |
 | `TAG:` / `VAR:` / `ESC:` | a `{tag}`, `[variable]`, or `\escape` the source has and the translation lost |
 | `TAG+:` / `VAR+:` / `ESC+:` | a token the translation **added or duplicated** — counts are compared, not sets |
 | `TAGNEST` | the translation closes a `{i}`/`{b}`/`{color}`… tag in a way the source did not — a mis-nested or unmatched `{/close}`. Ren'Py raises on this at runtime, and the tag *count* can still match, so `TAG:`/`TAG+:` miss it. Only fires when the source's own tags parse clean; an *unclosed* tag is not flagged (Ren'Py auto-closes it) |

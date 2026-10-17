@@ -20,6 +20,8 @@ import re
 import sys
 import tempfile
 from collections import Counter
+
+import terminology
 from pathlib import Path
 
 
@@ -176,8 +178,16 @@ def resolve_target_script(profile):
     return None, "none"
 
 
-def validation_policy(profile):
-    """The single source of validation policy, shared by both scripts."""
+def validation_policy(profile, base=None):
+    """The single source of validation policy, shared by every script.
+
+    With `base` (the profile's folder) the Terminology Dictionary is loaded
+    too, so ENFORCED terms are checked by the SAME gate at every point:
+    the bulk translator's save, TM-hit revalidation, and QA. A term check
+    that only QA ran would let a violation be saved and cached, then served
+    back free forever (ADR-017).
+    """
+    terms = terminology.load_terms(profile, base)[0] if base is not None else []
     cfg = profile.get("validation") or {}
     ranges, origin = resolve_target_script(profile)
     return {
@@ -189,7 +199,9 @@ def validation_policy(profile):
         "script_origin": origin,
         "min_script_chars": cfg.get("min_script_chars", 1),
         "allow_identical": set(cfg.get("allow_identical", [])),
-        "keep_untranslated": [k for k in profile.get("keep_untranslated", []) if k],
+        "keep_untranslated": [k for k in profile.get("keep_untranslated", []) if k]
+                             + terminology.keep_sources(terms),
+        "terms": terms,
     }
 
 
@@ -253,7 +265,7 @@ def has_target_script(text, ranges, minimum=1):
 
 
 def validate_translation(source, translation, policy):
-    """-> (ok, code) with code in EMPTY / TAGNEST / ECHO / SCRIPT / None.
+    """-> (ok, code) with code in EMPTY / TAGNEST / TERM / ECHO / SCRIPT / None.
 
     Gate order: empty -> nesting -> residue -> allow_identical -> echo -> script.
     The residue gate is what lets "Maya", "...", and "[points]" through; the
@@ -266,6 +278,9 @@ def validate_translation(source, translation, policy):
 
     if tag_nesting_ok(source) and not tag_nesting_ok(translation):
         return False, "TAGNEST"
+
+    if policy.get("terms") and terminology.violations(source, translation, policy["terms"]):
+        return False, "TERM"
 
     if not translatable_residue(source, policy.get("keep_untranslated", ())):
         return True, None
@@ -289,6 +304,7 @@ REASONS = {
     "TAGNEST": "produced a mismatched Ren'Py close tag",
     "ECHO": "returned the source text untranslated",
     "SCRIPT": "did not write in the target script",
+    "TERM": "broke an ENFORCED terminology rule",
 }
 
 

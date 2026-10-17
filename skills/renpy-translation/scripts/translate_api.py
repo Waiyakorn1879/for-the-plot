@@ -31,6 +31,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+import terminology
 from characters import (cast_block, character_line, display_name, gender_grammar,
                         resolve_alias, speech_gender)
 from relationships import build_resolver, relationships_config
@@ -550,11 +551,13 @@ RETRY_NAGS = {
             "be translated — copying the source is not a translation.",
     "SCRIPT": "was not written in the target script for some lines. Write the "
               "translation in <LANG>'s own script, not in English.",
+    "TERM": "did not follow the mandatory terminology for some lines. Use each "
+            "MANDATORY term from the TERMINOLOGY block exactly as given and avoid its NEVER forms.",
 }
 
 
 def translate_batch(call_model, system, speakers, lang_name, batch,
-                    retry=False, reasons=("TOKEN",), resolver=None):
+                    retry=False, reasons=("TOKEN",), resolver=None, terms=(), previous=None):
     """batch: list of {id, text, speaker, kind}. Returns list of {id, tr}.
 
     `reasons` selects the retry nag(s). Telling a model its tokens mismatched
@@ -570,6 +573,9 @@ def translate_batch(call_model, system, speakers, lang_name, batch,
     # full card on every line would multiply the prompt by the batch size; the
     # per-line label stays short and points back at the card by name.
     cast = cast_block(speakers, [item["speaker"] for item in batch])
+    # Terminology guidance rides in the USER message, like the cast block: the
+    # system prompt stays static so provider prompt caching keeps working.
+    glossary = terminology.guidance_block([item["text"] for item in batch], terms)
 
     lines = []
     for item in batch:
@@ -589,6 +595,7 @@ def translate_batch(call_model, system, speakers, lang_name, batch,
         )
     user_msg = (f"Translate these lines to {lang_name}. Output JSON array only.\n\n"
                 + (cast + "\n\n" if cast else "")
+                + (glossary + "\n\n" if glossary else "")
                 + "[\n" + ",\n".join(lines) + "\n]")
 
     if retry:
@@ -596,6 +603,13 @@ def translate_batch(call_model, system, speakers, lang_name, batch,
             # str.replace, not .format — the TOKEN nag contains a literal {tags}
             nag = RETRY_NAGS.get(code, RETRY_NAGS["TOKEN"]).replace("<LANG>", lang_name)
             user_msg += f"\n\nIMPORTANT: Your previous output {nag}"
+        # Terminology: name the term and the exact form per line, so the model
+        # fixes the actual violation instead of hunting for it. `previous` is
+        # the rejected output keyed by item id.
+        fixes = [f"- line {item['id']}: {fix}" for item in batch
+                 for fix in terminology.feedback(item["text"], (previous or {}).get(item["id"]) or "", terms)]
+        if fixes:
+            user_msg += "\n\nFix these terminology errors:\n" + "\n".join(fixes)
 
     raw = call_model(system, user_msg)
     result = extract_json_array(raw)
@@ -647,7 +661,7 @@ def main():
     lang_name = profile.get("language_name", profile.get("language_id", "the target language"))
     batch_size = profile.get("api", {}).get("batch_size", 20)
     system = build_system_instruction(profile, base)
-    policy = validation_policy(profile)
+    policy = validation_policy(profile, base)
     print(policy_banner(policy))
     call_model = make_call_model(profile)
 
@@ -748,13 +762,13 @@ def main():
         print(f"\nBatch {batch_num} ({i+1}-{i+len(batch)} of {len(todo)})...")
         try:
             result = translate_batch(call_model, system, speakers, lang_name, batch,
-                                     resolver=resolver)
+                                     resolver=resolver, terms=policy["terms"])
         except Exception as e:
             print(f"  API error: {e}. Sleeping 10s and retrying once.")
             time.sleep(10)
             try:
                 result = translate_batch(call_model, system, speakers, lang_name,
-                                         batch, resolver=resolver)
+                                         batch, resolver=resolver, terms=policy["terms"])
             except Exception as e2:
                 print(f"  Still failing: {e2}. Skipping batch.")
                 continue
@@ -784,7 +798,8 @@ def main():
             retry_result = translate_batch(call_model, system, speakers, lang_name,
                                            [item for item, _ in mismatches],
                                            retry=True, reasons=codes,
-                                           resolver=resolver)
+                                           resolver=resolver, terms=policy["terms"],
+                                           previous=id_to_tr)
             for r in retry_result:
                 if isinstance(r, dict) and "id" in r and "tr" in r:
                     id_to_tr[r["id"]] = r["tr"]

@@ -38,6 +38,7 @@ from characters import (
     gender_grammar, avoid_pattern, get_record, is_character,
     is_monologue, missing_must_use, register_rules, resolve_alias,
 )
+import terminology
 from relationships import build_resolver
 from validation import (
     ESC_RE, PCT_RE, TAG_RE, VAR_RE,
@@ -203,7 +204,7 @@ def main():
 
     ctx = ContextIndex(strings, window)
     keep_lower = {k.lower() for k in profile.get("keep_untranslated", [])}
-    policy = validation_policy(profile)
+    policy = validation_policy(profile, base)
 
     categories = defaultdict(list)  # category label -> issue tuples
 
@@ -227,8 +228,9 @@ def main():
         ok, code = validate_translation(text, tr, policy)
         untranslated = not ok
         if untranslated:
-            categories[1].append((code if code != "ECHO" else "UNTRANSLATED",
-                                  speaker, file, line, text, tr))
+            label = ("UNTRANSLATED" if code == "ECHO" else code if code != "TERM"
+                     else "TERM:" + terminology.explain(text, tr, policy["terms"]))
+            categories[1].append((label, speaker, file, line, text, tr))
 
         # Multiset, not set difference: a translation that ADDS or DUPLICATES
         # a tag is just as broken as one that drops it.
