@@ -13,7 +13,7 @@ Output: a JSON list of `{text, speaker, file, line, kind, label, label_cast}` wh
 - `menu` — player choice captions (`"Choice text":` / `"Choice text" if cond:`)
 - `text` — `show text "..."` on-screen text
 - `screen` (with `--screens`) — literal `text`/`textbutton`/`label`/`tooltip` strings inside `screen` blocks (speaker `_screen`)
-- `ui` (with `--screens`) — `_("...")`-wrapped strings anywhere, including python blocks and `$` lines (speaker `_ui`)
+- `ui` (with `--screens`) — `_("...")`-wrapped strings anywhere, including python blocks and `$` lines, and literal `renpy.input("...")` prompts (speaker `_ui`)
 
 `label` is the enclosing Ren'Py label (or `null` outside any) — the script's own scene boundary. `label_cast` (on dialog lines) is every speaker code appearing in that label, recorded **before** deduplication, and it is what `relationships.py` reads to decide whether a scene has exactly two people in it. The two fields are separate because dedupe drops a line whose text appeared earlier: a character whose only line in a scene is "Yeah." leaves no trace in the corpus, and counting who is left would read a three-person scene as a two-person one. **Re-extract after upgrading from a pre-v1.5 project**, or that resolution tier is simply unavailable (the report will say so).
 
@@ -38,3 +38,8 @@ After extraction, grep the sources for `renpy.say`, list-of-strings assignments,
 - Check `sorted({s["speaker"] for s in strings})` — this is also the input for building the profile's speaker table. Once the profile exists, `relationships.py --profile profile.json` lists any speaker code that still has no record.
 - Check that labels came through: `len({(s["file"], s["label"]) for s in strings if s["label"]})` should look like the number of scenes in the game, not 0 or 1. Every `say` entry with a `label` should also carry a non-empty `label_cast`.
 - Spot-check a few extracted strings against the source to confirm quotes/escapes survived (`\"` stays as the two characters `\"`).
+
+## What the extractor tells you (v1.5.2)
+
+- **Say grammar.** Attributes (`a happy "Hi"`) and trailers (`with dissolve`, `nointeract`, `id x`, `(args)`) are all accepted. A dialogue-shaped line that still matches nothing is printed as `WARNING: … NOT extracted` — read it before translating; a skipped line is never seen by QA.
+- **Shared texts.** Dedupe keeps one entry per text; if several characters say it, the entry carries `also_spoken_by`. One translation serves all of them, so the translator is told to write it neutrally when their genders differ (Thai), and QA checks it against every speaker.

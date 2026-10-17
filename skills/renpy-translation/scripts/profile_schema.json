@@ -170,6 +170,47 @@
       "type": "string",
       "description": "Declarative register/phrasing rules for qa_check.py. See references/qa.md."
     },
+    "nameplates_file": {
+      "type": "string",
+      "description": "JSON {speaker name: translated name}; translates say-box names"
+    },
+    "nameplate_patterns": {
+      "type": "array",
+      "description": "Derived speaker names such as \"X's Echo\"; {base} in format is the name minus the suffix",
+      "items": {
+        "type": "object",
+        "required": ["suffix", "format"],
+        "properties": {
+          "suffix": {"type": "string"},
+          "format": {"type": "string"}
+        }
+      }
+    },
+    "input_prompts_file": {
+      "type": "string",
+      "description": "JSON {renpy.input prompt: translation}"
+    },
+    "input_sync": {
+      "type": "array",
+      "description": "After the player types at a matching renpy.input prompt, set variables from `name`",
+      "items": {
+        "type": "object",
+        "required": ["prompt", "vars"],
+        "properties": {
+          "prompt": {"type": "string", "description": "Substring of the original prompt"},
+          "vars": {"type": "object", "additionalProperties": {"type": "string", "description": "Python expression of `name`"}}
+        }
+      }
+    },
+    "store_defaults": {
+      "type": "object",
+      "description": "Replay-safety seeds {variable: value}. Only names the game never default/defines - run replay_vars.py to find them"
+    },
+    "safe_store_files": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "A missing store variable read from a file whose name contains one of these returns \"\" instead of raising"
+    },
     "font": {
       "type": "object",
       "description": "Omit entirely if the game's fonts already cover the target script.",
@@ -181,6 +222,10 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "The game's original font files to substitute via config.font_replacement_map"
+        },
+        "text_size": {
+          "type": "integer",
+          "description": "Cap dialogue text size (Thai often needs ~28); omit to leave the game's size alone"
         },
         "size_scale": {
           "type": "number",

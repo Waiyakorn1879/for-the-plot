@@ -278,3 +278,18 @@ class TestProfileDrivenRuntime:
              "_thai_nameplates = " + code.split("_thai_nameplates = ", 1)[1], ns)
         assert ns["_thai_translate_who"]("Ann's Echo") == "echo แอน"
         assert ns["_thai_translate_who"]("Bob") == "Bob"
+
+
+class TestHandEditWarning:
+    def test_unedited_and_edited(self, tmp_path):
+        f = tmp_path / "00_x_filter.rpy"
+        assert build_patch.hand_edit_warning(f) is None            # missing
+        f.write_text(build_patch.stamp_generated("init python:\n    pass\n"), encoding="utf-8")
+        assert build_patch.hand_edit_warning(f) is None            # untouched
+        f.write_text(f.read_text(encoding="utf-8") + "    hack = 1\n", encoding="utf-8")
+        assert "edited by hand" in build_patch.hand_edit_warning(f)
+
+    def test_unstamped_file_not_judged(self, tmp_path):
+        f = tmp_path / "old.rpy"
+        f.write_text("init python:\n    pass\n", encoding="utf-8")
+        assert build_patch.hand_edit_warning(f) is None

@@ -199,3 +199,14 @@ class TestSayGrammar:
                        check=True, capture_output=True, text=True)
         (e,) = json.loads(out.read_text(encoding="utf-8"))
         assert e["speaker"] == "a" and e["also_spoken_by"] == ["b"]
+
+
+def test_input_prompts_extracted_with_screens(tmp_path):
+    f = tmp_path / "s.rpy"
+    f.write_text('label a:\n'
+                 '    $ mc = renpy.input("What is your name?", length=12)\n'
+                 "    $ x = renpy.input('Pick a number')\n"
+                 '    $ y = renpy.input(_("Already marked"))\n', encoding="utf-8")
+    got = [(e["kind"], e["text"]) for e in extract_strings.extract(f, screens=True)]
+    assert got == [("ui", "What is your name?"), ("ui", "Pick a number"), ("ui", "Already marked")]
+    assert extract_strings.extract(f) == []

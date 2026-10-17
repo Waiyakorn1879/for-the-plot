@@ -3,7 +3,8 @@
 Outputs a JSON list of {text, speaker, file, line, kind, label}
 - kind = "say" | "menu" | "text" | "narrator"
 - with --screens additionally: "screen" (literal text/textbutton/label/tooltip
-  inside screen blocks) and "ui" (_()-wrapped strings anywhere).
+  inside screen blocks) and "ui" (_()-wrapped strings anywhere, and literal
+  renpy.input() prompts).
 - label = the enclosing Ren'Py label, or null outside any. It is the script's
   own scene boundary, and relationships.py scopes addressee resolution to it;
   strings.json files extracted before v1.5 simply lack the field.
@@ -67,6 +68,11 @@ SCREEN_TEXT_RE = re.compile(
 # the trailing _( of __("...") matches too, covering the immediate form.
 UNDERSCORE_RE = re.compile(r'_\(\s*(["\'])((?:(?!\1)[^\\]|\\.)*)\1\s*\)')
 
+# renpy.input("prompt", ...) — a literal prompt is shown to the player but is
+# not `_()`-marked, so it is invisible to every other pattern. (An already
+# `_()`-wrapped prompt starts with `_(`, not a quote, and is not matched twice.)
+INPUT_RE = re.compile(r'renpy\.input\(\s*(["\'])((?:(?!\1)[^\\]|\\.)*)\1')
+
 # tokens with no translatable content once vars/tags are stripped
 _VAR_TAG_RE = re.compile(r'\[[^\]]+\]|\{[^}]+\}')
 
@@ -107,7 +113,7 @@ def extract(rpy_path: Path, screens=False, suspects=None):
             # _( "..." ) strings are translatable wherever they appear,
             # including python blocks and $ lines — scan before any skips.
             if screens and not stripped.startswith("#"):
-                for m in UNDERSCORE_RE.finditer(line):
+                for m in (*UNDERSCORE_RE.finditer(line), *INPUT_RE.finditer(line)):
                     txt = m.group(2)
                     if txt.strip() and has_translatable_content(txt):
                         out.append({"text": txt, "speaker": "_ui",

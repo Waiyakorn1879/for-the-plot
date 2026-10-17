@@ -31,7 +31,7 @@ The generated filter contains nothing game-specific on its own. These profile ke
 | `safe_store_files` | `["gallery"]` — a missing store variable read from a frame in a file with this substring returns `""` instead of raising |
 | `font.text_size` | cap dialogue size (Thai often needs ~28) |
 
-Find replay variables by testing the in-game gallery with the patch installed; an `Uncaught Exception … has no attribute 'x'` names the next one to add. **Never hand-edit the generated `00_<lang>_filter.rpy`** — the next build overwrites it; put the change in the profile.
+Run `python replay_vars.py --src decompiled/ [--json]` to list variables assigned only during play (the ones a replay will not have) with a neutral starting value each; confirm which your gallery touches. An `Uncaught Exception … has no attribute 'x'` in the gallery names any it missed. **Never hand-edit the generated `00_<lang>_filter.rpy`** — the next build overwrites it; put the change in the profile. Since v1.5.2 the file carries a `# build-hash:` line, and a build prints a `WARNING` if the file was edited after its last build.
 
 ## Fonts (non-Latin targets)
 
