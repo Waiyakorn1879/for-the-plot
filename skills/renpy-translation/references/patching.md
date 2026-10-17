@@ -33,6 +33,10 @@ The generated filter contains nothing game-specific on its own. These profile ke
 
 Run `python replay_vars.py --src decompiled/ [--json]` to list variables assigned only during play (the ones a replay will not have) with a neutral starting value each; confirm which your gallery touches. An `Uncaught Exception … has no attribute 'x'` in the gallery names any it missed. **Never hand-edit the generated `00_<lang>_filter.rpy`** — the next build overwrites it; put the change in the profile. Since v1.5.2 the file carries a `# build-hash:` line, and a build prints a `WARNING` if the file was edited after its last build.
 
+## Per-speaker translations for shared texts
+
+One English text has one dictionary translation. When a male and a female character both say "Hi!", that translation is unisex by design. To give each their own, run `python speaker_overrides.py todo --profile profile.json`: it lists every (speaker, text) pair, for texts said by *both* genders, that has no override yet (speakers of unknown gender and minor extras keep the unisex line). Fill the `tr` fields — in-session, by API, or by hand; ask the user which, as for any translation — then `speaker_overrides.py merge --profile profile.json --file <filled list>`. Merge applies the bulk translator's validity gate, token parity, and the speaker's own gender rule, and saves only what passes into `speaker_translations.json` (`{"code::text": "translation"}`, speaker code as extracted). `build_patch.py` turns that file into overrides; the runtime filter looks up the speaker from the `Say` statement it runs inside. `status` shows progress. Needs a `strings.json` from v1.5.2 or later (it carries `also_spoken_by`).
+
 ## Fonts (non-Latin targets)
 
 With a `font` section in the profile, the filter also: overrides the `font` (and scaled `size`) of the standard text styles when the language is active, and fills `config.font_replacement_map` so any style it missed still falls back to the target font. **The font files themselves must be copied into `game/`** (top level) alongside the patch. Adjust `size_scale` after seeing real dialog in-game.

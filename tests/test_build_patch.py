@@ -293,3 +293,11 @@ class TestHandEditWarning:
         f = tmp_path / "old.rpy"
         f.write_text("init python:\n    pass\n", encoding="utf-8")
         assert build_patch.hand_edit_warning(f) is None
+
+
+def test_speaker_overrides_reach_the_dictionary_file():
+    (_, content), = build_patch.build_dict_rpy(
+        {"Hi!": "สวัสดี"}, "thai", "Thai",
+        speaker_translations={("an", "Hi!"): "สวัสดีค่ะ", ("mc", "Hi!"): "สวัสดีครับ"})
+    assert "_thai_speaker_translations.update" in content
+    assert "(u'an', u'Hi!')" in content and "(u'mc', u'Hi!')" in content

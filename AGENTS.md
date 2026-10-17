@@ -20,6 +20,7 @@ All in `skills/renpy-translation/scripts/`, cross-platform, UTF-8, stdlib-only:
 | `init_project.py` | **start here** — scaffold a project folder beside the game (`--game`, `--language`) |
 | `extract_strings.py` | game sources → `strings.json` |
 | `translate_api.py` | bulk translation → progress JSON (providers: `deepseek` / `openai-compatible` / `gemini` / `anthropic` / `claude-cli`) |
+| `speaker_overrides.py` | texts said by both genders → per-speaker translations (`todo` / `merge` / `status`) |
 | `replay_vars.py` | variables a gallery replay would crash on → `store_defaults` skeleton |
 | `qa_check.py` | technical + register QA; exit 1 while hard issues remain |
 | `build_patch.py` | progress JSON → drop-in patch files |
