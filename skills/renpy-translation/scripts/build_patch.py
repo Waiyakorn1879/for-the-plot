@@ -87,7 +87,62 @@ def renpy_source_literal(s):
     return '"' + s + '"'
 
 
-def build_filter_rpy(profile):
+def py_literal(v):
+    """Python-2-safe literal for a JSON scalar from the profile (str/bool/num/None)."""
+    return py2_unicode_repr(v) if isinstance(v, str) else repr(v)
+
+
+def build_store_block(profile):
+    """Replay/gallery safety net, entirely profile-driven.
+
+    `store_defaults` {name: value}: seeded into the store when the game has not
+    defined the name — scene replays run outside the story flow, so variables
+    assigned only during play are undefined there and raise NameError. List
+    only names the game never `default`s: a seeded value makes Ren'Py's own
+    `default` skip that name.
+    `safe_store_files` [substrings]: a missing store attribute read from a
+    frame whose file name contains one of these returns "" instead of raising.
+    Neither key set -> no output, and the store is never touched.
+    """
+    defaults = profile.get("store_defaults") or {}
+    files = profile.get("safe_store_files") or []
+    if not (defaults or files):
+        return ""
+    entries = "".join(f"        {py2_unicode_repr(k)}: {py_literal(v)},\n"
+                      for k, v in sorted(defaults.items()))
+    out = f"""    # Replay safety net (profile: store_defaults / safe_store_files)
+    _store_defaults = {{
+{entries}    }}
+    for _k, _v in _store_defaults.items():
+        if not hasattr(renpy.store, _k):
+            setattr(renpy.store, _k, _v)
+"""
+    if files:
+        out += f"""
+    _safe_store_files = ({", ".join(py2_unicode_repr(f.lower()) for f in files)},)
+    _orig_store_getattr = getattr(renpy.python.StoreModule, "__getattr__", None)
+    def _safe_store_getattr(self, key):
+        if key in _store_defaults:
+            return _store_defaults[key]
+        try:
+            f = sys._getframe(1)
+            for _ in range(5):
+                if f:
+                    fn = getattr(f.f_code, "co_filename", "").lower()
+                    if any(x in fn for x in _safe_store_files):
+                        return ""
+                    f = f.f_back
+        except Exception:
+            pass
+        if _orig_store_getattr:
+            return _orig_store_getattr(self, key)
+        raise AttributeError("'StoreModule' object has no attribute '%s'" % key)
+    renpy.python.StoreModule.__getattr__ = _safe_store_getattr
+"""
+    return out + "\n"
+
+
+def build_filter_rpy(profile, nameplates=None, input_prompts=None):
     lang = profile["language_id"]
     ident = re.sub(r"\W", "_", lang)  # safe python identifier fragment
     lang_name = profile.get("language_name", lang)
@@ -95,6 +150,7 @@ def build_filter_rpy(profile):
     toggle_key = profile.get("toggle_key", "K_F11")
     auto_set = profile.get("auto_set_language", False)
     font = profile.get("font")
+    store_block = build_store_block(profile)
 
     parts = []
     parts.append(f'''# {lang_name} translation runtime loader for {game}
@@ -109,7 +165,7 @@ init -1 python:
     _{ident}_filter_hits = [0]
     _{ident}_last_miss = [""]
 
-    def _{ident}_get_speaker():
+{store_block}    def _{ident}_get_speaker():
         try:
             f = sys._getframe(1)
             for _ in range(5):
@@ -221,6 +277,13 @@ translate {lang} python:
         replace_fonts = font.get("replace_fonts", [])
         size_scale = font.get("size_scale", 1.0)
         base_sizes = font.get("base_sizes", {})
+        # Optional dialogue size cap (font.text_size): only when the profile asks,
+        # since forcing a size on a game that doesn't need it shrinks its text.
+        cap = font.get("text_size")
+        text_size_block = (
+            f"        if getattr(persistent, \"text_size\", {cap + 1}) > {cap}:\n"
+            f"            persistent.text_size = {cap}\n"
+            f"        gui.text_size = {cap}\n" if cap else "")
         default_styles = ["default", "say_dialogue", "say_thought", "say_label",
                           "namebox", "namebox_label", "button", "button_text",
                           "choice_button", "choice_button_text", "notify",
@@ -255,7 +318,7 @@ init 2001 python:
     def _{ident}_apply_font():
         if renpy.game.preferences.language != "{lang}":
             return
-        for sname in ({styles_tuple},):
+{text_size_block}        for sname in ({styles_tuple},):
             try:
                 getattr(style, sname).font = _{ident.upper()}_FONT
             except Exception:
@@ -286,8 +349,114 @@ init 2001 python:
     def _{ident}_change_language(lang, force=False):
         result = _prev_change_language(lang, force) if force else _prev_change_language(lang)
         _{ident}_apply_font()
+        if '_{ident}_apply_nameplates' in globals():
+            _{ident}_apply_nameplates()
         return result
     renpy.change_language = _{ident}_change_language
+''')
+
+    if nameplates:
+        nameplate_entries = ",\n        ".join(
+            f"{py2_unicode_repr(k)}: {py2_unicode_repr(v)}"
+            for k, v in sorted(nameplates.items())
+        )
+        # Possessive/derived speaker names ("X's Echo"), declared per game in
+        # profile.nameplate_patterns: [{"suffix": "'s Echo", "format": "... {base}"}].
+        # `base` is the name with the suffix removed, looked up in nameplates.
+        pattern_entries = ",\n        ".join(
+            f"({py2_unicode_repr(p['suffix'])}, {py2_unicode_repr(p['format'])})"
+            for p in profile.get("nameplate_patterns") or []
+        )
+        parts.append(f'''
+# Character nameplates in {lang_name}
+init 2002 python:
+    _{ident}_nameplates = {{
+        {nameplate_entries}
+    }}
+
+    _{ident}_nameplate_patterns = [
+        {pattern_entries}
+    ]
+
+    def _{ident}_translate_who(who):
+        if not who:
+            return who
+        if who in _{ident}_nameplates:
+            return _{ident}_nameplates[who]
+        for suffix, fmt in _{ident}_nameplate_patterns:
+            if who.endswith(suffix):
+                base = who[:-len(suffix)]
+                return fmt.replace(u"{{base}}", _{ident}_nameplates.get(base, base))
+        return who
+
+    def _{ident}_apply_nameplates():
+        is_active = (renpy.game.preferences.language == "{lang}")
+        for k, v in list(renpy.store.__dict__.items()):
+            if isinstance(v, renpy.character.ADVCharacter):
+                if not hasattr(v, "_{ident}_orig_name"):
+                    v._{ident}_orig_name = v.name
+                if is_active:
+                    orig = v._{ident}_orig_name
+                    if orig is not None:
+                        v.name = _{ident}_translate_who(orig)
+                else:
+                    if hasattr(v, "_{ident}_orig_name"):
+                        v.name = v._{ident}_orig_name
+
+    _orig_show_display_say = renpy.character.show_display_say
+    def _{ident}_show_display_say(who, what, *args, **kwargs):
+        if renpy.game.preferences.language == "{lang}" and who:
+            who = _{ident}_translate_who(who)
+        return _orig_show_display_say(who, what, *args, **kwargs)
+    renpy.character.show_display_say = _{ident}_show_display_say
+
+    _{ident}_apply_nameplates()
+    config.start_callbacks.append(_{ident}_apply_nameplates)
+    config.after_load_callbacks.append(_{ident}_apply_nameplates)
+''')
+
+    # renpy.input hook: translated prompts, and variables derived from what the
+    # player typed (profile.input_sync) — a game that precomputes forms of the
+    # protagonist's name ("Or", "O-Orion") must recompute them for a Thai name,
+    # or replays and later scenes keep the English-derived forms.
+    sync = profile.get("input_sync") or []
+    if input_prompts or sync:
+        prompt_entries = ",\n        ".join(
+            f"{py2_unicode_repr(k)}: {py2_unicode_repr(v)}"
+            for k, v in sorted((input_prompts or {}).items())
+        )
+        sync_entries = ",\n        ".join(
+            "(" + py2_unicode_repr(rule["prompt"]) + ", [" + ", ".join(
+                f"({py2_unicode_repr(var)}, compile({py2_unicode_repr(expr)}, '<input_sync>', 'eval'))"
+                for var, expr in sorted(rule["vars"].items())) + "])"
+            for rule in sync
+        )
+        parts.append(f'''
+# Input prompts and input-derived variables in {lang_name}
+init 2002 python:
+    _{ident}_input_prompts = {{
+        {prompt_entries}
+    }}
+
+    # (substring of the original prompt, [(variable, compiled expression of `name`)])
+    _{ident}_input_sync = [
+        {sync_entries}
+    ]
+
+    _orig_input = renpy.exports.input
+    def _{ident}_input(prompt, *args, **kwargs):
+        p = prompt
+        if renpy.game.preferences.language == "{lang}" and prompt:
+            p = _{ident}_input_prompts.get(prompt, _{ident}_translations.get(prompt, prompt))
+        result = _orig_input(p, *args, **kwargs)
+        name = (result or "").strip()
+        if name:
+            for needle, assigns in _{ident}_input_sync:
+                if needle in (prompt or ""):
+                    for var, code in assigns:
+                        setattr(renpy.store, var, eval(code, {{}}, {{"name": name}}))
+        return result
+    renpy.exports.input = _{ident}_input
 ''')
 
     return "".join(parts)
@@ -371,10 +540,24 @@ def main():
     dict_translations = {k: v for k, v in translations.items()
                          if k not in strings_translations}
 
+    # Load character nameplates if configured
+    nameplates_path = base / profile.get("nameplates_file", "nameplates.json")
+    nameplates = {}
+    if nameplates_path.is_file():
+        nameplates = json.loads(nameplates_path.read_text(encoding="utf-8"))
+        print(f"Loaded {len(nameplates)} character nameplates from {nameplates_path.name}")
+
+    # Load input prompts if configured
+    input_prompts_path = base / profile.get("input_prompts_file", "input_prompts.json")
+    input_prompts = {}
+    if input_prompts_path.is_file():
+        input_prompts = json.loads(input_prompts_path.read_text(encoding="utf-8"))
+        print(f"Loaded {len(input_prompts)} input prompt translations from {input_prompts_path.name}")
+
     # Atomic: an interrupted build must not leave a truncated .rpy, which
     # would be a syntax error inside the player's game folder.
     filter_path = out_dir / f"00_{ident}_filter.rpy"
-    write_text_atomic(filter_path, build_filter_rpy(profile))
+    write_text_atomic(filter_path, build_filter_rpy(profile, nameplates=nameplates, input_prompts=input_prompts))
     print(f"Wrote {filter_path}")
 
     # Load character-specific translation overrides if speaker_translations.json exists

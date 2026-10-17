@@ -17,6 +17,22 @@ Writes to `<output_dir>/tl/<language_id>/`:
 - **Debug counters:** the toggle key's `renpy.notify` shows dict size, filter calls/hits, and whether our filter is still installed (`OVERRIDDEN` means a mod stomped it after init — investigate init order).
 - The empty `translate <lang> python: pass` block is what registers the language with Ren'Py so `preferences.language` can be set to it.
 
+## Runtime hooks from the profile (all optional)
+
+The generated filter contains nothing game-specific on its own. These profile keys switch on the hooks a particular game needs; a profile without them builds exactly as before.
+
+| Key | Effect |
+|---|---|
+| `nameplates_file` | JSON `{speaker name: translated name}`; translates say-box names and `Character.name` |
+| `nameplate_patterns` | `[{"suffix": "'s Echo", "format": "... {base}"}]` — derived names; `{base}` is the name minus the suffix, looked up in the nameplates |
+| `input_prompts_file` | JSON `{prompt: translation}` for `renpy.input` prompts |
+| `input_sync` | `[{"prompt": "What is your name?", "vars": {"short": "name[:2]"}}]` — after the player types, recompute variables from `name` (games that precompute forms of the protagonist's name) |
+| `store_defaults` | `{var: value}` seeded when undefined, so **scene replays** (gallery) don't `NameError` on variables only set during play. List only names the game never `default`s — a seeded name makes Ren'Py's own `default` skip it |
+| `safe_store_files` | `["gallery"]` — a missing store variable read from a frame in a file with this substring returns `""` instead of raising |
+| `font.text_size` | cap dialogue size (Thai often needs ~28) |
+
+Find replay variables by testing the in-game gallery with the patch installed; an `Uncaught Exception … has no attribute 'x'` names the next one to add. **Never hand-edit the generated `00_<lang>_filter.rpy`** — the next build overwrites it; put the change in the profile.
+
 ## Fonts (non-Latin targets)
 
 With a `font` section in the profile, the filter also: overrides the `font` (and scaled `size`) of the standard text styles when the language is active, and fills `config.font_replacement_map` so any style it missed still falls back to the target font. **The font files themselves must be copied into `game/`** (top level) alongside the patch. Adjust `size_scale` after seeing real dialog in-game.

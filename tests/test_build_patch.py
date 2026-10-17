@@ -215,3 +215,66 @@ class TestKindRouting:
         assert "u'Hello!': u'Salut !'," in dict_content
         assert "u'Continue': u'Continuer'," in dict_content
         assert not (out / "02_french_strings.rpy").exists()
+
+
+class TestProfileDrivenRuntime:
+    """Game-specific runtime behaviour comes from the profile, never the template."""
+
+    BASE = {"language_id": "thai", "language_name": "Thai", "game_name": "G",
+            "font": {"regular": "a.ttf"}}
+
+    @staticmethod
+    def python_of(rpy):
+        """The code of every `init N python:` block, dedented."""
+        out, grab = [], False
+        for line in rpy.split("\n"):
+            if line.startswith("init"):
+                grab = line.rstrip().endswith("python:")
+            elif grab and (line.startswith("    ") or not line.strip()):
+                out.append(line[4:])
+            elif line.strip():
+                grab = False
+        return "\n".join(out)
+
+    def test_unconfigured_profile_emits_no_game_specifics(self):
+        rpy = build_patch.build_filter_rpy(self.BASE)
+        for needle in ("_store_defaults", "StoreModule", "input_sync", "text_size"):
+            assert needle not in rpy
+        compile(self.python_of(rpy), "<filter>", "exec")
+
+    def test_configured_runtime_compiles_and_behaves(self):
+        profile = dict(self.BASE, store_defaults={"mc": "Neo", "flag": False},
+                       safe_store_files=["gallery"],
+                       font={"regular": "a.ttf", "text_size": 28},
+                       input_sync=[{"prompt": "name?", "vars": {"short": "name[:2]"}}],
+                       nameplate_patterns=[{"suffix": "'s Echo", "format": "echo {base}"}])
+        rpy = build_patch.build_filter_rpy(
+            profile, nameplates={"Ann": "แอน"}, input_prompts={"name?": "ชื่อ?"})
+        code = self.python_of(rpy)
+        compile(code, "<filter>", "exec")
+        assert "gui.text_size = 28" in code
+
+        # run just the store block against stand-ins for the engine
+        import types
+        block = rpy.split("init -1 python:")[1].split("def _thai_get_speaker")[0]
+        block = "\n".join(l[4:] for l in block.split("\n"))
+        store = types.SimpleNamespace()
+        class StoreModule: pass
+        renpy = types.SimpleNamespace(store=store, python=types.SimpleNamespace(StoreModule=StoreModule))
+        env = {"renpy": renpy, "sys": sys}
+        exec(block.replace("_thai_translations = {}", ""), env)
+        assert store.mc == "Neo" and store.flag is False
+        assert StoreModule.__getattr__(StoreModule(), "mc") == "Neo"
+        import pytest
+        with pytest.raises(AttributeError):
+            StoreModule.__getattr__(StoreModule(), "nope")
+
+    def test_nameplate_patterns_use_base_lookup(self):
+        profile = dict(self.BASE, nameplate_patterns=[{"suffix": "'s Echo", "format": "echo {base}"}])
+        rpy = build_patch.build_filter_rpy(profile, nameplates={"Ann": "แอน"})
+        ns = {}
+        code = self.python_of(rpy).split("def _thai_apply_nameplates")[0]
+        exec(code.split("# Character nameplates")[-1].split("_thai_nameplates = ", 1)[0] and
+             "_thai_nameplates = " + code.split("_thai_nameplates = ", 1)[1], ns)
+        assert ns["_thai_translate_who"]("Ann's Echo") == "echo แอน"
+        assert ns["_thai_translate_who"]("Bob") == "Bob"
