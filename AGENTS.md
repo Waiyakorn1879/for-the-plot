@@ -22,6 +22,7 @@ All in `skills/renpy-translation/scripts/`, cross-platform, UTF-8, stdlib-only:
 | `translate_api.py` | bulk translation → progress JSON (providers: `deepseek` / `openai-compatible` / `gemini` / `anthropic` / `claude-cli`) |
 | `speaker_overrides.py` | texts said by both genders → per-speaker translations (`todo` / `merge` / `status`) |
 | `edit_lines.py` | fix specific lines by `file:line` (regex jobs; dry-run, backup, shared-key + token gate) |
+| `find_twins.py` | dictionary keys differing only by `\"` / curly apostrophe yet translated differently; exit 1 if any |
 | `terminology.py` | terminology dictionary: sweep / add / promote / preflight / import (also a shared library) |
 | `replay_vars.py` | variables a gallery replay would crash on → `store_defaults` skeleton |
 | `qa_check.py` | technical + register QA; exit 1 while hard issues remain |

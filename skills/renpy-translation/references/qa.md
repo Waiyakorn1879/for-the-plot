@@ -161,3 +161,4 @@ When `language_id` is `thai`, the prompt and QA both know the gender grammar (`G
 
 ## Fixing individual lines
 After an audit finds a few bad lines, fix them with `edit_lines.py` (dry-run first; it backs up, applies the validity gate, and warns when a dictionary entry is shared with lines you are not editing). Confirm the fix in the running game: `references/verify-in-engine.md`.
+Also run `find_twins.py --profile profile.json` before building: it fails while two spellings of one source text (`\"` vs `"`, curly vs straight apostrophe) carry different translations.
