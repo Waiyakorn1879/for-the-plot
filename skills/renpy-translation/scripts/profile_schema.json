@@ -273,6 +273,20 @@
         }
       }
     },
+    "punctuation": {
+      "type": "object",
+      "description": "Opt-in punctuation policy, enforced by punctuation.py and counted (informational) by qa_check.py.",
+      "properties": {
+        "exclamation": {
+          "type": "object",
+          "description": "Drop '!' from translations unless the source earns it: ALL CAPS, '!!', a shout tag, or a short interjection. Presence of this block turns the policy on.",
+          "properties": {
+            "short_words": { "type": "integer", "default": 2, "description": "A source line ending in '!' with at most this many words keeps it." },
+            "shout_pattern": { "type": "string", "description": "Regex (case-insensitive) for a shout marker in the source. Default matches *Shouts*, *Yelling*, *Screams* ..." }
+          }
+        }
+      }
+    },
     "validation": {
       "type": "object",
       "description": "Output validity gates shared by translate_api.py (which refuses to save or cache a failing translation) and qa_check.py (which reports the same failures as category 1). Omit entirely for the defaults.",

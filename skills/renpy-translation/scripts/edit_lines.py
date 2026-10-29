@@ -26,8 +26,29 @@ import sys
 import time
 from pathlib import Path
 
-from speaker_overrides import _paths, _read, check
-from validation import configure_console, write_text_atomic
+from validation import (ESC_RE, TAG_RE, VAR_RE, configure_console, multiset_diff,
+                        validate_translation, validation_policy, write_text_atomic)
+
+def _read(path, default):
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else default
+
+
+def _paths(profile, base):
+    """-> (speaker overrides, translations, strings) file paths."""
+    return (base / profile.get("speaker_translations_file", "speaker_translations.json"),
+            base / profile.get("progress_file", "translations.json"),
+            base / profile.get("strings_file", "strings.json"))
+
+
+def gate(source, new, profile, base):
+    """-> None if `new` is acceptable, else a reason (same gate as merge)."""
+    ok, code = validate_translation(source, new, validation_policy(profile, base))
+    if not ok:
+        return code
+    for label, rx in (("TAG", TAG_RE), ("VAR", VAR_RE), ("ESC", ESC_RE)):
+        missing, extra = multiset_diff(rx.findall(source), rx.findall(new))
+        if missing or extra:
+            return f"{label}:{','.join(missing + extra)}"
 
 
 def plan(jobs, rows, tr, sp, profile, base):
@@ -53,7 +74,7 @@ def plan(jobs, rows, tr, sp, profile, base):
         if new == old:
             problems.append(f"nochange {where} {old[:40]!r}")
             continue
-        why = check(text, new, None, profile, None, base)
+        why = gate(text, new, profile, base)
         if why:
             problems.append(f"REJECTED {where} {why}: {new[:60]!r}")
             continue
@@ -77,7 +98,7 @@ def main():
 
     pp = Path(args.profile)
     profile, base = json.loads(pp.read_text(encoding="utf-8")), pp.parent
-    sp_path, _, tr_path, strings_path = _paths(profile, base)
+    sp_path, tr_path, strings_path = _paths(profile, base)
     tr, sp = _read(tr_path, {}), _read(sp_path, {})
     jobs = json.loads(Path(args.jobs).read_text(encoding="utf-8"))
     changes, problems = plan(jobs, _read(strings_path, []), tr, sp, profile, base)

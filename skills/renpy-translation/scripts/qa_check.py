@@ -38,6 +38,7 @@ from characters import (
     gender_grammar, avoid_pattern, get_record, is_character,
     is_monologue, missing_must_use, register_rules, resolve_alias,
 )
+import punctuation
 import terminology
 from relationships import build_resolver
 from validation import (
@@ -207,6 +208,8 @@ def main():
     policy = validation_policy(profile, base)
 
     categories = defaultdict(list)  # category label -> issue tuples
+    bang_policy = punctuation.policy(profile)
+    bang_over = 0
 
     for idx, s in enumerate(strings):
         text, speaker, file, line = s["text"], s["speaker"], s["file"], s["line"]
@@ -249,6 +252,9 @@ def main():
 
         if args.technical_only:
             continue
+
+        if bang_policy and punctuation.over_policy(text, tr, bang_policy):
+            bang_over += 1
 
         # ── Declarative register/phrasing rules ────────────────────────────
         # A deduplicated text shared by several speakers is judged against each.
@@ -333,6 +339,9 @@ def main():
         if resolver.unknown_speakers:
             emit(f"  {len(resolver.unknown_speakers)} speaker code(s) have no "
                  f"character record — run relationships.py to list them.")
+    if bang_policy and not args.technical_only:
+        emit(f"  Exclamation policy: {bang_over} line(s) carry a '!' the policy would drop "
+             "(run punctuation.py; informational, not a failure)")
     emit("#" * 72)
 
     section_titles = {

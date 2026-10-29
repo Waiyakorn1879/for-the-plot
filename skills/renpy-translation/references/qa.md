@@ -162,3 +162,8 @@ When `language_id` is `thai`, the prompt and QA both know the gender grammar (`G
 ## Fixing individual lines
 After an audit finds a few bad lines, fix them with `edit_lines.py` (dry-run first; it backs up, applies the validity gate, and warns when a dictionary entry is shared with lines you are not editing). Confirm the fix in the running game: `references/verify-in-engine.md`.
 Also run `find_twins.py --profile profile.json` before building: it fails while two spellings of one source text (`\"` vs `"`, curly vs straight apostrophe) carry different translations.
+
+## Pair audit and punctuation policy
+- **Two-speaker runs.** Register errors that belong to a *pair* (two friends sharing one fixed pronoun set) slip past speaker-only rules. Declare `"pairs": [{"name", "between": [A, B], "forbid": regex, "min_run": 3, "skip_labels": []}]` in the `qa_rules_file` and run `pair_audit.py --profile profile.json` (needs a `--no-dedupe` extract). It lists lines of every A/B-only run that match the forbidden form. Expect false positives to filter by eye: role-play, flashbacks, quoted text, a character playing someone else. It reads script order and never feeds addressee resolution (ADR-020).
+- **Exclamation marks.** Add `"punctuation": {"exclamation": {}}` to the profile to opt in. `qa_check.py` then reports how many lines carry a `!` the policy would drop (informational); `punctuation.py` previews and applies the softening. The rule is form-based, so review the dry-run for shouted lower-case lines.
+- **Thai edits.** Use `thai_text.replace_word` in edit scripts rather than `\b` or `[ะ-์]` lookarounds: Thai has no spaces and that range contains the leading vowels เ แ โ ใ ไ.

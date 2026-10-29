@@ -14,11 +14,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from validation import configure_console
-
-
-def norm(s):
-    return s.replace('\\"', '"').replace("’", "'")
+from validation import configure_console, norm_key as norm
 
 
 def find_twins(tr):

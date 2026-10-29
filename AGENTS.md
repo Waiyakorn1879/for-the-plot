@@ -23,6 +23,9 @@ All in `skills/renpy-translation/scripts/`, cross-platform, UTF-8, stdlib-only:
 | `speaker_overrides.py` | texts said by both genders → per-speaker translations (`todo` / `merge` / `status`) |
 | `edit_lines.py` | fix specific lines by `file:line` (regex jobs; dry-run, backup, shared-key + token gate) |
 | `find_twins.py` | dictionary keys differing only by `\"` / curly apostrophe yet translated differently; exit 1 if any |
+| `pair_audit.py` | register leaks inside two-speaker conversation runs (pairs declared in `qa_rules.json`); review list |
+| `punctuation.py` | opt-in `!` policy: dry-run / `--write` softening of translations (profile `punctuation.exclamation`) |
+| `thai_text.py` | safe Thai word replacement (token masking, explicit compound exclusions); library |
 | `terminology.py` | terminology dictionary: sweep / add / promote / preflight / import (also a shared library) |
 | `replay_vars.py` | variables a gallery replay would crash on → `store_defaults` skeleton |
 | `qa_check.py` | technical + register QA; exit 1 while hard issues remain |
@@ -51,6 +54,6 @@ python skills/renpy-translation/scripts/qa_check.py --profile profile.json --tec
 
 Two design notes worth knowing before changing anything:
 
-- **`validation.py`, `characters.py`, `relationships.py` and `terminology.py` are the only shared imports.** Every other tool talks through files. The validity gate, the atomic writer, the character records, and addressee resolution live there because each must be *identical* everywhere — a check the bulk translator enforces and QA doesn't is worse than no check, a voice the prompt asks for but the gate doesn't check is worse than either alone, and a QA rule that judges a different pairing than the prompt named is worse still. Shared helpers may be imported; shared stores (the Translation Memory) may not.
+- **`validation.py`, `characters.py`, `relationships.py`, `terminology.py` and `punctuation.py` are the only shared imports** (`thai_text.py` is a leaf library for edit scripts; nothing in the pipeline imports it). Every other tool talks through files. The validity gate, the atomic writer, the character records, and addressee resolution live there because each must be *identical* everywhere — a check the bulk translator enforces and QA doesn't is worse than no check, a voice the prompt asks for but the gate doesn't check is worse than either alone, and a QA rule that judges a different pairing than the prompt named is worse still. Shared helpers may be imported; shared stores (the Translation Memory) may not.
 - **Addressee resolution must be able to refuse.** `relationships.py` answers only from evidence it can name in a report, and returns *unresolved* with a reason otherwise. A wrong addressee yields a wrong pronoun on a well-formed line — invisible to every other check. Do not add a tier that fires when the others decline (ADR-020).
 - **Nothing unvalidated is persisted.** An echoed source has an identical token signature, so token parity alone once let untranslated English into the progress store *and* into the cache, where it was served back for free forever. Rejection happens before both writes, and on cache reads too.

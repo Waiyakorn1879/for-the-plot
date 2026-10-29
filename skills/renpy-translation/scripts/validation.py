@@ -44,6 +44,33 @@ TAG_RE = re.compile(r"\{[^}]+\}")           # text tags: {i}, {/b}, {w=0.5}
 ESC_RE = re.compile(r'\\[n"\'\\]')          # escapes: \n \" \' \\
 PCT_RE = re.compile(r"%%")                  # literal percent in a % format string
 
+def norm_key(text):
+    """A source text with the spellings the engine may swap made equal: an
+    escaped quote and a curly apostrophe. Lookups that must find a line however
+    it was spelled (find_twins, pair_audit) compare on this."""
+    return text.replace('\\"', '"').replace("’", "'")
+
+
+# Every token that must survive a text edit untouched.
+_TOKEN_RE = re.compile(r"\[[^\]]+\]|\{[^}]+\}|\\[n\"'\\]|%%")
+
+
+def mask_tokens(text):
+    """-> (masked, tokens). Swap each variable/tag/escape/%% for a NUL-delimited
+    placeholder so a regex edit of the prose cannot touch it; restore with
+    `unmask_tokens`. Edits made on masked text keep token parity by construction."""
+    toks = []
+
+    def hold(m):
+        toks.append(m.group(0))
+        return "\x00%d\x00" % (len(toks) - 1)
+    return _TOKEN_RE.sub(hold, text), toks
+
+
+def unmask_tokens(text, toks):
+    return re.sub(r"\x00(\d+)\x00", lambda m: toks[int(m.group(1))], text)
+
+
 # Everything that carries no translatable content on its own.
 _VAR_TAG_RE = re.compile(r"\[[^\]]+\]|\{[^}]+\}")
 
