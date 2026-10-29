@@ -305,13 +305,19 @@ translate {lang} python:
         replace_fonts = font.get("replace_fonts", [])
         size_scale = font.get("size_scale", 1.0)
         base_sizes = font.get("base_sizes", {})
-        # Optional dialogue size cap (font.text_size): only when the profile asks,
-        # since forcing a size on a game that doesn't need it shrinks its text.
+        # Optional dialogue size default (font.text_size): only when the profile asks.
+        # Sets initial default if not yet set, without clamping user's custom setting.
         cap = font.get("text_size")
+        # One-time default: players still on the game's own default size (or none) get `cap`;
+        # anyone who already chose a size keeps it. Flag stops it re-applying after they pick the default.
+        text_size_init = (
+            f"    _{ident.upper()}_ORIG_TEXT_SIZE = gui.text_size\n\n" if cap else "")
         text_size_block = (
-            f"        if getattr(persistent, \"text_size\", {cap + 1}) > {cap}:\n"
-            f"            persistent.text_size = {cap}\n"
-            f"        gui.text_size = {cap}\n" if cap else "")
+            f"        if not getattr(persistent, \"_{ident}_size_set\", False):\n"
+            f"            persistent._{ident}_size_set = True\n"
+            f"            if getattr(persistent, \"text_size\", None) in (None, _{ident.upper()}_ORIG_TEXT_SIZE):\n"
+            f"                persistent.text_size = {cap}\n"
+            f"        gui.text_size = getattr(persistent, \"text_size\", {cap})\n" if cap else "")
         default_styles = ["default", "say_dialogue", "say_thought", "say_label",
                           "namebox", "namebox_label", "button", "button_text",
                           "choice_button", "choice_button_text", "notify",
@@ -343,7 +349,7 @@ init 2001 python:
     _{ident.upper()}_SIZE_SCALE = {size_scale}
     _{ident.upper()}_BASE_SIZES = {{ {sizes_body} }}
 
-    def _{ident}_apply_font():
+{text_size_init}    def _{ident}_apply_font():
         if renpy.game.preferences.language != "{lang}":
             return
 {text_size_block}        for sname in ({styles_tuple},):

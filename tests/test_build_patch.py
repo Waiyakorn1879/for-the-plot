@@ -252,7 +252,9 @@ class TestProfileDrivenRuntime:
             profile, nameplates={"Ann": "แอน"}, input_prompts={"name?": "ชื่อ?"})
         code = self.python_of(rpy)
         compile(code, "<filter>", "exec")
-        assert "gui.text_size = 28" in code
+        assert "gui.text_size = getattr(persistent, \"text_size\", 28)" in code
+        # one-time default: guarded by a flag so the player's own size survives
+        assert "_size_set" in code and "_ORIG_TEXT_SIZE = gui.text_size" in code
 
         # run just the store block against stand-ins for the engine
         import types
