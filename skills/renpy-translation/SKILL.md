@@ -22,7 +22,7 @@ Full workflow for translating a Ren'Py visual novel into any target language. Wo
 4. Translate   strings → translations.json            → references/translating.md
 5. QA          technical + register checks            → references/qa.md
 6. Patch       translations → game/tl/<lang>/ files   → references/patching.md
-7. Deploy      copy patch into game, launch, verify   → references/patching.md
+7. Deploy      copy patch into game, launch, verify   → references/patching.md, references/verify-in-engine.md
 ```
 
 Start a new project with `python init_project.py --game <path> --language <id>`: it creates the working folder beside the game with a wired-up `profile.json`, a style-guide skeleton, `qa_rules.json`, a `.gitignore` that keeps game text out of version control, and **`TRANSLATION.md`** — the project's own always-loaded instruction file, with harness stubs (`CLAUDE.md`/`AGENTS.md`/`GEMINI.md`) pointing at it. A translation runs for hundreds of batches across many sessions; rules that live only in chat history get re-broken within ten batches.

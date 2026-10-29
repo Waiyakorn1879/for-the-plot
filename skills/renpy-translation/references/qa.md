@@ -158,3 +158,6 @@ When `language_id` is `thai`, the prompt and QA both know the gender grammar (`G
 - **unknown gender, minor extras** (role contains `extra`/`background`/`minor`/`crowd`) **and speakers with no record** must stay unisex — none of the above. These are category-2 findings (`Name: unisex speech`, `unknown speaker: gendered speech`).
 - A text spoken by several characters (`also_spoken_by` in `strings.json`) is translated once, so the prompt marks it `shared_by` and asks for a unisex rendering when their genders differ; QA checks it against every speaker.
 - Opt a character out (e.g. a woman who speaks with `ครับ` on purpose) with `"gender_grammar": false` on the record.
+
+## Fixing individual lines
+After an audit finds a few bad lines, fix them with `edit_lines.py` (dry-run first; it backs up, applies the validity gate, and warns when a dictionary entry is shared with lines you are not editing). Confirm the fix in the running game: `references/verify-in-engine.md`.

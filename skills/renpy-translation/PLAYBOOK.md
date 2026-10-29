@@ -32,7 +32,7 @@ Every section is tagged. Know which rules you inherit and which you must rebuild
 | 4 | Translate | **[PORTABLE]** | `references/translating.md` |
 | 5 | QA | **[PORTABLE]** method, **[ADAPT]** rules | `references/qa.md` |
 | 6 | Patch | **[RE-DERIVE]** | `references/patching.md` |
-| 7 | Deploy | **[RE-DERIVE]** | `references/patching.md` |
+| 7 | Deploy | **[RE-DERIVE]** | `references/patching.md`, `references/verify-in-engine.md` |
 
 Read the reference for a phase **when you reach it**; don't preload everything.
 
