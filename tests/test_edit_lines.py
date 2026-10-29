@@ -47,3 +47,31 @@ def test_shared_key_warned_and_token_loss_rejected(tmp_path):
     job = [{"file": "a.rpy", "line": 1, "sub": [[r"\[x\]", ""]]}]
     setup(tmp_path, [say("Hi [x].", "a", 1)], {"Hi [x].": "ฉัน [x]"}, jobs=job)
     assert "REJECTED" in run(tmp_path)
+
+
+def test_two_jobs_on_one_shared_entry_compose(tmp_path):
+    jobs = [{"file": "a.rpy", "line": 1, "sub": [["ฉัน", "ข้า"]]},
+            {"file": "a.rpy", "line": 2, "sub": [["นาย", "เอ็ง"]]}]
+    setup(tmp_path, [say("Go.", "a", 1), say("Go.", "a", 2)], {"Go.": "ฉันและนาย"}, jobs=jobs)
+    run(tmp_path, "--write")
+    assert json.loads((tmp_path / "tr.json").read_text(encoding="utf-8")) == {"Go.": "ข้าและเอ็ง"}
+
+
+def test_bad_jobs_exit_with_a_message_not_a_traceback(tmp_path):
+    for bad in ([{"file": "a.rpy", "line": 1}], [{"file": "a.rpy", "line": 1, "sub": [["(", "x"]]}]):
+        setup(tmp_path, [say("Go.", "a", 1)], {"Go.": "ฉัน"}, jobs=bad)
+        p = subprocess.run([sys.executable, str(SCRIPTS_DIR / "edit_lines.py"),
+                            "--profile", str(tmp_path / "profile.json"),
+                            "--jobs", str(tmp_path / "jobs.json")],
+                           capture_output=True, text=True, encoding="utf-8")
+        assert p.returncode != 0 and "Traceback" not in p.stderr
+
+
+def test_backups_never_overwrite_each_other(tmp_path):
+    from validation import backup_file
+    f = tmp_path / "x.json"
+    f.write_text("one")
+    a = backup_file(f)
+    f.write_text("two")
+    b = backup_file(f)
+    assert a != b and a.read_text() == "one" and b.read_text() == "two"

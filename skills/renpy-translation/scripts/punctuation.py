@@ -20,12 +20,11 @@ cannot change.
 import argparse
 import json
 import re
-import shutil
-import time
 from pathlib import Path
 
-from validation import (configure_console, is_echo, mask_tokens, unmask_tokens,
+from validation import (MASK_SRC, backup_file, configure_console, is_echo, mask_tokens, unmask_tokens,
                         write_text_atomic)
+
 
 def _read(path, default):
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else default
@@ -49,7 +48,7 @@ def policy(profile):
 
 def keep(source, cfg):
     """True if `source` earns its `!` under the policy."""
-    plain = re.sub(r"\x00\d+\x00", "", mask_tokens(source)[0]).replace("*", "")
+    plain = re.sub(MASK_SRC, "", mask_tokens(source)[0]).replace("*", "")
     letters = re.sub(r"[^A-Za-z]", "", plain)
     if len(letters) >= 3 and letters.isupper():
         return True
@@ -64,7 +63,8 @@ def keep(source, cfg):
 def soften(translation):
     masked, toks = mask_tokens(translation)
     s = re.sub(r"\?!+", "?", masked)
-    s = re.sub(r"!+(?=\s*(?:\*|\x00\d+\x00|\"|”|\)|$))", "", s)
+    s = re.sub(r"!+(?=(?:" + MASK_SRC + r")+\w)", " ", s)   # Go!{w}Now: keep words apart
+    s = re.sub(r"!+(?=\s*(?:\*|" + MASK_SRC + r"|\"|”|\)|$))", "", s)
     s = re.sub(r"!+\s+", " ", s)
     s = re.sub(r"!+(?=\w)", " ", s)
     return unmask_tokens(s.replace("!", ""), toks).rstrip()
@@ -93,12 +93,15 @@ def main():
               (sp_path, _read(sp_path, {}), lambda k: k.split("::", 1)[-1])]
 
     changed = marks = 0
+    touched = set()
     for path, d, source_of in stores:
         for k, v in d.items():
             src = source_of(k)
             if over_policy(src, v, cfg):
                 new = soften(v)
-                changed += new != v
+                if new != v:
+                    changed += 1
+                    touched.add(path)
                 marks += v.count("!") - new.count("!")
                 d[k] = new
     left = sum(v.count("!") for _, d, _ in stores for v in d.values())
@@ -106,12 +109,11 @@ def main():
     if not args.write:
         print("dry-run: nothing written (use --write)")
         return
-    stamp = time.strftime("%Y%m%d-%H%M%S")
     for path, d, _ in stores:
-        if path.is_file():
-            shutil.copy2(path, path.with_name(f"{path.name}.bak-{stamp}"))
+        if path in touched:
+            bak = backup_file(path)
             write_text_atomic(path, json.dumps(d, ensure_ascii=False, indent=2))
-            print(f"wrote {path.name} (backup .bak-{stamp})")
+            print(f"wrote {path.name} (backup {bak.name})")
 
 
 if __name__ == "__main__":

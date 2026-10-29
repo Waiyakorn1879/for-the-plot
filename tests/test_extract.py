@@ -212,3 +212,15 @@ def test_input_prompts_extracted_with_screens(tmp_path):
     got = [(e["kind"], e["text"]) for e in extract_strings.extract(f, screens=True)]
     assert got == [("ui", "What is your name?"), ("ui", "Pick a number"), ("ui", "Already marked")]
     assert extract_strings.extract(f) == []
+
+
+def test_malformed_with_trailer_cannot_blow_up(tmp_path):
+    """`with` swallows the rest of the line, so it may appear once; a repeatable
+    group made lines like this exponential."""
+    import time
+    f = tmp_path / "s.rpy"
+    f.write_text('label x:\n    a "x"' + " with x" * 3000 + ' garbage"\n'
+                 '    a "y"with' + " with" * 3000 + '"\n', encoding="utf-8")
+    t = time.time()
+    extract_strings.extract(f)
+    assert time.time() - t < 2

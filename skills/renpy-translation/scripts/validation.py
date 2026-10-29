@@ -63,12 +63,18 @@ def mask_tokens(text):
 
     def hold(m):
         toks.append(m.group(0))
-        return "\x00%d\x00" % (len(toks) - 1)
+        if len(toks) > 0x1900:
+            raise ValueError("too many tokens to mask in one string")
+        # one private-use char, never a digit or letter an edit could target
+        return "\x00" + chr(0xE000 + len(toks) - 1) + "\x00"
     return _TOKEN_RE.sub(hold, text), toks
 
 
+MASK_SRC = r"\x00[-]\x00"   # regex source matching one placeholder
+
+
 def unmask_tokens(text, toks):
-    return re.sub(r"\x00(\d+)\x00", lambda m: toks[int(m.group(1))], text)
+    return re.sub(r"\x00([-])\x00", lambda m: toks[ord(m.group(1)) - 0xE000], text)
 
 
 # Everything that carries no translatable content on its own.
@@ -374,3 +380,19 @@ def write_text_atomic(path, text, encoding="utf-8"):
         except OSError:
             pass
         raise
+
+
+def backup_file(path):
+    """Copy `path` to `<name>.bak-<timestamp>`, never overwriting an earlier backup
+    (two runs in one second would otherwise replace the original with data the
+    first run already changed). Returns the backup's path."""
+    import shutil
+    import time
+    path = Path(path)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    dest, n = path.with_name(f"{path.name}.bak-{stamp}"), 1
+    while dest.exists():
+        n += 1
+        dest = path.with_name(f"{path.name}.bak-{stamp}-{n}")
+    shutil.copy2(path, dest)
+    return dest

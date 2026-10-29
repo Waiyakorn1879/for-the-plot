@@ -11,8 +11,9 @@ jobs.json is a list of regex substitutions per line:
 
 Lines are found in strings.json by (file, line), so extract with --no-dedupe if
 a line is missing ("norow"). The edit lands on the speaker override
-(`speaker::text`) when one exists, else on the dictionary entry. Every result is
-held to the same gate as merge (tokens, tag nesting, echo, script, terms).
+(`speaker::text`) when one exists, else on the dictionary entry. Several jobs
+that hit the same entry are applied in order. Every result is held to the same
+gate as merge (tokens, tag nesting, echo, script, terms).
 
 A dictionary entry serves EVERY line with that text. If other rows share it and
 are not in the jobs, they change too: reported as SHARED. Resolve it with a
@@ -21,13 +22,13 @@ speaker override instead of editing the shared entry.
 import argparse
 import json
 import re
-import shutil
 import sys
-import time
 from pathlib import Path
 
-from validation import (ESC_RE, TAG_RE, VAR_RE, configure_console, multiset_diff,
-                        validate_translation, validation_policy, write_text_atomic)
+from validation import (ESC_RE, TAG_RE, VAR_RE, backup_file, configure_console,
+                        multiset_diff, norm_key, validate_translation,
+                        validation_policy, write_text_atomic)
+
 
 def _read(path, default):
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else default
@@ -51,10 +52,35 @@ def gate(source, new, profile, base):
             return f"{label}:{','.join(missing + extra)}"
 
 
+def check_jobs(jobs):
+    """Fail with a message, not a traceback, on a malformed jobs file."""
+    if not isinstance(jobs, list):
+        sys.exit("jobs file must be a list of {file, line, sub} objects")
+    for i, j in enumerate(jobs):
+        if not (isinstance(j, dict) and isinstance(j.get("file"), str)
+                and isinstance(j.get("line"), int) and isinstance(j.get("sub"), list)
+                and all(isinstance(s, list) and len(s) == 2 and all(isinstance(x, str) for x in s)
+                        for s in j["sub"])):
+            sys.exit(f'job #{i + 1} needs "file" (str), "line" (int) and "sub" '
+                     f'(a list of [pattern, replacement] pairs): {json.dumps(j, ensure_ascii=False)[:100]}')
+        for pat, _ in j["sub"]:
+            try:
+                re.compile(pat)
+            except re.error as e:
+                sys.exit(f"job #{i + 1} ({j['file']}:{j['line']}): bad pattern {pat!r}: {e}")
+
+
+def _finder(d):
+    """key -> the stored spelling of it (exact, else equal after norm_key)."""
+    alt = {norm_key(k): k for k in d}
+    return lambda key: key if key in d else alt.get(norm_key(key))
+
+
 def plan(jobs, rows, tr, sp, profile, base):
     """-> (changes {(store, key): (old, new, where)}, problems [str])."""
     by_pos = {(r["file"], r["line"]): r for r in rows if r.get("kind") == "say"}
     wanted = {(j["file"], j["line"]) for j in jobs}
+    find = {"sp": _finder(sp), "tr": _finder(tr)}
     changes, problems = {}, []
     for j in jobs:
         where = f"{j['file']}:{j['line']}"
@@ -63,16 +89,20 @@ def plan(jobs, rows, tr, sp, profile, base):
             problems.append(f"norow    {where} (not in strings.json; extract with --no-dedupe?)")
             continue
         text, spk = r["text"], r["speaker"]
-        store, key = (("sp", f"{spk}::{text}") if f"{spk}::{text}" in sp else ("tr", text))
+        key = find["sp"](f"{spk}::{text}")
+        store = "sp" if key else "tr"
+        key = key or find["tr"](text)
         d = sp if store == "sp" else tr
-        if key not in d:
+        if key is None:
             problems.append(f"nokey    {where} {text[:40]!r}")
             continue
-        old = new = d[key]
+        # Jobs on one entry compose in order; the first one's edit must survive.
+        orig, current, wheres = changes.get((store, key), (d[key], d[key], ""))
+        new = current
         for pat, repl in j["sub"]:
             new = re.sub(pat, repl, new)
-        if new == old:
-            problems.append(f"nochange {where} {old[:40]!r}")
+        if new == current:
+            problems.append(f"nochange {where} {current[:40]!r}")
             continue
         why = gate(text, new, profile, base)
         if why:
@@ -84,7 +114,7 @@ def plan(jobs, rows, tr, sp, profile, base):
                       and (x["file"], x["line"]) not in wanted]
             if others or r.get("also_spoken_by"):
                 problems.append(f"SHARED   {where} also: {others[:3] or r['also_spoken_by']}")
-        changes[(store, key)] = (old, new, where)
+        changes[(store, key)] = (orig, new, f"{wheres}, {where}" if wheres else where)
     return changes, problems
 
 
@@ -100,7 +130,11 @@ def main():
     profile, base = json.loads(pp.read_text(encoding="utf-8")), pp.parent
     sp_path, tr_path, strings_path = _paths(profile, base)
     tr, sp = _read(tr_path, {}), _read(sp_path, {})
-    jobs = json.loads(Path(args.jobs).read_text(encoding="utf-8"))
+    jobs_path = Path(args.jobs)
+    if not jobs_path.is_file():
+        sys.exit(f"jobs file not found: {jobs_path}")
+    jobs = json.loads(jobs_path.read_text(encoding="utf-8"))
+    check_jobs(jobs)
     changes, problems = plan(jobs, _read(strings_path, []), tr, sp, profile, base)
 
     for p in problems:
@@ -111,16 +145,15 @@ def main():
     if not args.write:
         print("dry-run: nothing written (use --write)")
         return
-    stamp = time.strftime("%Y%m%d-%H%M%S")
     for path, d, tag in ((tr_path, tr, "tr"), (sp_path, sp, "sp")):
         if not any(s == tag for s, _ in changes) or not path.is_file():
             continue
-        shutil.copy2(path, path.with_name(f"{path.name}.bak-{stamp}"))
+        bak = backup_file(path)
         for (s, k), (_, new, _) in changes.items():
             if s == tag:
                 d[k] = new
         write_text_atomic(path, json.dumps(d, ensure_ascii=False, indent=2))
-        print(f"wrote {path.name} (backup .bak-{stamp})")
+        print(f"wrote {path.name} (backup {bak.name})")
 
 
 if __name__ == "__main__":

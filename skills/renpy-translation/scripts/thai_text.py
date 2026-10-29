@@ -34,4 +34,4 @@ def replace_word(text, old, new, not_before=(), not_after=()):
     if not_after:
         pat += "(?!" + "|".join(re.escape(s) for s in not_after) + ")"
     masked, toks = mask_tokens(text)
-    return unmask_tokens(re.sub(pat, new, masked), toks)
+    return unmask_tokens(re.sub(pat, lambda m: new, masked), toks)

@@ -39,7 +39,11 @@ configure_console()
 # fails to match here is never extracted, so QA never sees its speaker (the
 # "a \"Hi!\" with dissolve" bug). `"Hi!"with dis08` (no space) is legal Ren'Py too.
 # Allows escaped quotes inside the text.
-_SAY_TRAILER = r'(?:\s*\([^)]*\)|\s+nointeract|\s+id\s+\w+|(?:\s+|(?<=[")]))with\s+[^:"\n]+?)*'
+# A `with` clause swallows the rest of the line, so it may appear ONCE; letting it
+# repeat inside a `*` made a malformed line ("x"with with with ...) exponential.
+_ARGS = r'(?:\s*\([^)]*\)|\s+nointeract|\s+id\s+\w+)'
+_WITH = r'(?:(?:\s+|(?<=[")]))with\s+[^:"\n]+?)'
+_SAY_TRAILER = _ARGS + '*(?:' + _WITH + _ARGS + '*)?'
 SAY_RE = re.compile(
     r'^(\s*)([a-zA-Z_]\w*)((?:\s+[\w@.]+)*)\s+"((?:[^"\\]|\\.)*)"' + _SAY_TRAILER + r'\s*$'
 )

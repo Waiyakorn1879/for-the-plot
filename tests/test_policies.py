@@ -73,3 +73,23 @@ def test_empty_block_enables_policy_and_qa_counts_it(tmp_path):
                           str(tmp_path / "profile.json")], capture_output=True, text=True,
                          encoding="utf-8").stdout
     assert "Exclamation policy: 1 line(s)" in out
+
+
+def test_replace_word_is_literal_and_ignores_placeholder_digits():
+    assert thai_text.replace_word("แกไป", "แก", r"\1\n") == r"\1\nไป"
+    assert thai_text.replace_word("[a] 0", "0", "Z") == "[a] Z"
+
+
+def test_soften_keeps_words_apart_across_a_tag():
+    assert punctuation.soften("Go!{w=1}Now") == "Go {w=1}Now"
+    assert punctuation.soften("Go!{/i} Now") == "Go{/i} Now"
+
+
+def test_pair_audit_rejects_malformed_rules():
+    import pytest
+    for bad in ({"name": "x", "between": ["a", "b"]},
+                {"name": "x", "between": ["a", "a"], "forbid": "x"},
+                {"name": "x", "between": ["a", "b"], "forbid": "("},
+                {"name": "x", "between": ["a", "b"], "forbid": "x", "min_run": 1}):
+        with pytest.raises(SystemExit):
+            pair_audit.check_rules([bad])

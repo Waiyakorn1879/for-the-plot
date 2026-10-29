@@ -65,6 +65,31 @@ def runs(strings, speakers, between, min_run=3):
                           and resolve_alias(speakers, s["speaker"]) in pair) else []
 
 
+def check_rules(pair_rules):
+    """Fail with a message, not a traceback, on a malformed rule."""
+    for i, r in enumerate(pair_rules, 1):
+        bad = None
+        if not isinstance(r, dict):
+            bad = "must be an object"
+        elif not isinstance(r.get("name"), str):
+            bad = 'needs a "name"'
+        elif not (isinstance(r.get("between"), list) and len(r["between"]) == 2
+                  and len(set(r["between"])) == 2):
+            bad = '"between" must list two different speaker codes'
+        elif not isinstance(r.get("forbid"), (str, dict)):
+            bad = '"forbid" must be a regex or {speaker: regex}'
+        elif not isinstance(r.get("min_run", 3), int) or r.get("min_run", 3) < 2:
+            bad = '"min_run" must be an integer >= 2'
+        if bad:
+            raise SystemExit(f"pairs rule #{i}: {bad}")
+        f = r["forbid"]
+        for rx in (f.values() if isinstance(f, dict) else [f]):
+            try:
+                re.compile(rx)
+            except (re.error, TypeError) as e:
+                raise SystemExit(f"pairs rule #{i} ({r['name']}): bad forbid pattern {rx!r}: {e}")
+
+
 def audit(strings, tr, sp, speakers, pair_rules):
     """-> [(rule name, speaker, file, line, source, translation)]"""
     alt = {norm(k): v for k, v in tr.items()}
@@ -102,6 +127,7 @@ def main():
     pairs = conf.get("pairs", [])
     if not pairs:
         raise SystemExit('no "pairs" in the qa_rules_file; nothing to audit')
+    check_rules(pairs)
     found = audit(_read(strings_path, []), _read(tr_path, {}), _read(sp_path, {}),
                   profile.get("speakers", {}), pairs)
     for name, spk, f, ln, en, tr in found:
