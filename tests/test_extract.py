@@ -166,6 +166,7 @@ class TestSayGrammar:
         '    a happy "Attrs line."\n'
         '    a happy "Attrs and trailer." (what_size=20) nointeract with fade\n'
         '    "Narrated." with dissolve\n'
+        '    a "No space."with dis08\n'
         '    play sound "boom.ogg"\n'
         '    e = Character("Eileen")\n'
         '    a "Broken" garbage here\n'
@@ -184,6 +185,7 @@ class TestSayGrammar:
         assert ("a", "Attrs line.") in got
         assert ("a", "Attrs and trailer.") in got
         assert ("narrator", "Narrated.") in got
+        assert ("a", "No space.") in got
         assert not any(t == "boom.ogg" for _, t in got)
 
     def test_unmatched_dialogue_shape_is_reported(self, tmp_path):

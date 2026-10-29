@@ -37,8 +37,9 @@ configure_console()
 # Ren'Py say statement: `who [attrs] "text" [(args)] [nointeract] [id x] [with trans]`.
 # Every trailer is optional and may repeat in any order; a line that silently
 # fails to match here is never extracted, so QA never sees its speaker (the
-# "a \"Hi!\" with dissolve" bug). Allows escaped quotes inside the text.
-_SAY_TRAILER = r'(?:\s*\([^)]*\)|\s+nointeract|\s+id\s+\w+|\s+with\s+[^:"\n]+?)*'
+# "a \"Hi!\" with dissolve" bug). `"Hi!"with dis08` (no space) is legal Ren'Py too.
+# Allows escaped quotes inside the text.
+_SAY_TRAILER = r'(?:\s*\([^)]*\)|\s+nointeract|\s+id\s+\w+|(?:\s+|(?<=[")]))with\s+[^:"\n]+?)*'
 SAY_RE = re.compile(
     r'^(\s*)([a-zA-Z_]\w*)((?:\s+[\w@.]+)*)\s+"((?:[^"\\]|\\.)*)"' + _SAY_TRAILER + r'\s*$'
 )
