@@ -1,0 +1,124 @@
+{
+  "game_name": "Pocket Cafe (synthetic fixture)",
+  "language_id": "schinese",
+  "language_name": "Simplified Chinese",
+  "orthography": {
+    "variant": "simplified"
+  },
+  "source_dir": "decompiled",
+  "strings_file": "strings.json",
+  "progress_file": "translations.json",
+  "output_dir": "output",
+  "style_guide_file": "translation-guide.md",
+  "qa_rules_file": "qa_rules.json",
+  "toggle_key": "K_F11",
+  "auto_set_language": true,
+  "validation": {
+    "target_script": "chinese"
+  },
+  "font": {
+    "regular": "SourceHanSansSC-Regular.otf",
+    "italic": "SourceHanSansSC-Regular.otf",
+    "replace_fonts": [
+      "DejaVuSans.ttf"
+    ],
+    "size_scale": 1.0
+  },
+  "speakers": {
+    "mc": {
+      "name": "Reed",
+      "gender": "male",
+      "role": "protagonist, easygoing student",
+      "register": "casual spoken Mainland Chinese; short sentences; dry humour",
+      "self_pronoun": "我",
+      "address_pronoun": "你",
+      "monologue": {
+        "self_pronoun": "我"
+      },
+      "to": {
+        "prof": {
+          "address_pronoun": "您",
+          "note": "respectful with the professor, still natural",
+          "forbidden": [
+            "喂",
+            "老头"
+          ]
+        },
+        "nora": {
+          "address_pronoun": "你",
+          "note": "peers, no honorifics",
+          "forbidden": [
+            "您"
+          ]
+        }
+      },
+      "examples": [
+        {
+          "en": "Morning, all of you.",
+          "tr": "各位，早上好。"
+        },
+        {
+          "en": "Nobody here but me.",
+          "tr": "这里除了我，一个人也没有。"
+        }
+      ]
+    },
+    "nora": {
+      "name": "Nora",
+      "gender": "female",
+      "role": "classmate, tired and blunt",
+      "register": "blunt, clipped; drops pronouns; sentence-final 吧 and 啦 when softening",
+      "self_pronoun": "我",
+      "forbidden": [
+        "您"
+      ],
+      "examples": [
+        {
+          "en": "Could not sleep.",
+          "tr": "睡不着。"
+        },
+        {
+          "en": "Stop staring at me.",
+          "tr": "别盯着我看。"
+        }
+      ]
+    },
+    "prof": {
+      "name": "Professor",
+      "gender": "male",
+      "role": "literature professor, formal",
+      "register": "formal, measured; complete sentences; no slang",
+      "self_pronoun": "我",
+      "address_pronoun": "你",
+      "forbidden": [
+        "老子",
+        "哥们"
+      ],
+      "examples": [
+        {
+          "en": "Take a seat, Mr. Reed.",
+          "tr": "请坐，里德先生。"
+        }
+      ]
+    },
+    "hero": {
+      "name": "Hero",
+      "gender": "male",
+      "role": "narrated customer in the cafe scene"
+    },
+    "partner": {
+      "name": "Partner",
+      "gender": "female",
+      "role": "cafe regular"
+    }
+  },
+  "relationships": {
+    "declared": []
+  },
+  "keep_untranslated": [],
+  "api": {
+    "provider": "deepseek",
+    "batch_size": 20,
+    "temperature": 0.3
+  }
+}

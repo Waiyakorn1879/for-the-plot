@@ -61,9 +61,9 @@ A character who speaks under more than one code (`"???"` before introduction) ge
 
 When starting a new game, copy the example's structure, not its content.
 
-## Chinese target — ask which script first
+## Target language — read its locale file
 
-**If the target is Chinese, ask the user "Simplified (Mainland China, Singapore) or Traditional (Taiwan, Hong Kong)?" before scaffolding. Never assume or default.** Then scaffold with `--language schinese` or `tchinese`; the choice is written to the profile and **locked** for the project: `init_project.py` refuses a generic `chinese` id, and `translate_api.py` and `qa_check.py` stop on an unknown or contradictory script. Changing it later means re-translating. Details: `references/chinese.md`.
+**If `references/locales/` has a file for the target language (see its README), read it before scaffolding.** Some locale files name a decision the user must make first, and you must ask, never assume. Today that is Chinese: ask "Simplified (Mainland China, Singapore) or Traditional (Taiwan, Hong Kong)?" before scaffolding, then scaffold with `--language schinese` or `tchinese`. The choice is written to the profile and locked: `init_project.py` refuses a generic `chinese` id, and `translate_api.py` and `qa_check.py` stop on an unknown or contradictory script. `init_project.py` prints the locale files to read for the language it scaffolds.
 
 ## Translation method — always ask first
 
@@ -90,7 +90,7 @@ In Claude Code they live in `${CLAUDE_PLUGIN_ROOT}/skills/renpy-translation/scri
 | `build_patch.py` | progress JSON → patch files (`--profile`, `--translations`, `--strings`, `--out`, `--split-size`) |
 | `translation_memory.py` | Translation Memory cache + tooling (`stats` / `export` / `import` / `clean`, all `--profile`) |
 | `relationships.py` | addressee resolution + the who-speaks-to-whom report (`--profile`, `--strings`, `--report`) |
-| `orthography.py` | Chinese writing conventions: prompt rule, QA checks, fixer (`--profile`, `--write`); see `references/chinese.md` |
+| `orthography.py` | target-language writing conventions (Chinese today; modules in `langs/`): prompt rule, QA checks, fixer (`--profile`, `--write`); see `references/locales/` |
 | `characters.py` | character records → persona cards + QA register rules (library, no CLI) |
 | `validation.py` | shared output-validity gate + atomic writer used by the others (library, no CLI) |
 | `profile_schema.json` | JSON Schema documenting `profile.json` |

@@ -28,7 +28,7 @@ Every section is tagged. Know which rules you inherit and which you must rebuild
 | 0 | Init | **[PORTABLE]** | `scripts/init_project.py` |
 | 1 | Decompile | **[RE-DERIVE]** | `references/decompiling.md` |
 | 2 | Extract | **[RE-DERIVE]** (output shape is [PORTABLE]) | `references/extraction.md`, `references/engine-seam.md` |
-| 3 | Profile | **[PORTABLE]** structure, **[ADAPT]** content | `references/game-profile.md`, `references/terminology.md`; Chinese targets: `references/chinese.md` |
+| 3 | Profile | **[PORTABLE]** structure, **[ADAPT]** content | `references/game-profile.md`, `references/terminology.md`, `references/locales/` |
 | 4 | Translate | **[PORTABLE]** | `references/translating.md` |
 | 5 | QA | **[PORTABLE]** method, **[ADAPT]** rules | `references/qa.md` |
 | 6 | Patch | **[RE-DERIVE]** | `references/patching.md` |
@@ -44,9 +44,9 @@ python scripts/init_project.py --game "<game install>" --language <id>
 
 It scaffolds the project beside the game — profile, style-guide skeleton, QA rules, a `.gitignore` that keeps game text out of version control, and **`TRANSLATION.md`**, the project's own always-loaded instruction file, with `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` stubs pointing at it. That file is the point: a translation runs for hundreds of batches across many sessions, and a convention discovered at string 1,400 gets re-broken by string 1,450 unless it lives somewhere loaded every time.
 
-## §2a Chinese: choose the script first [ADAPT]
+## §2a Target language: read its locale file [ADAPT]
 
-If the target is Chinese, ask the user whether it is **Simplified** (Mainland China, Singapore) or **Traditional** (Taiwan, Hong Kong) before scaffolding. Never assume. Scaffold with `--language schinese` or `tchinese`: the choice goes into `profile.json` and is locked for the project, because `init_project.py` refuses a generic `chinese` id and `translate_api.py` and `qa_check.py` stop on an unknown or contradictory script. Changing it later means re-translating. See `references/chinese.md`.
+If `references/locales/` has a file for the target language (see its README), read it before scaffolding: register and speech rules, writing conventions, fonts, and any decision the user must make first. Ask, never assume. Today that is Chinese: ask whether it is **Simplified** (Mainland China, Singapore) or **Traditional** (Taiwan, Hong Kong), then scaffold with `--language schinese` or `tchinese`. The choice goes into `profile.json` and is locked for the project: `init_project.py` refuses a generic `chinese` id, and `translate_api.py` and `qa_check.py` stop on an unknown or contradictory script. Changing it later means re-translating. `init_project.py` prints the locale files for the language it scaffolds.
 
 ## §2b Character records and relationships [PORTABLE] structure, [RE-DERIVE] cast
 

@@ -150,14 +150,13 @@ These are known limits, not bugs — a check that pretended to cover them would 
 - **Runtime-built text.** `extract_strings.py` reads `.rpy` source; strings a game assembles in Python at runtime (phone UIs, social feeds) can bypass extraction entirely and need the wrapper-layer template in `references/custom-subsystems.md`.
 - **Unresolved addressees.** `relationships.py` resolves an addressee only from named evidence and reports everything else as unresolved *with a reason* (ADR-020). That is deliberate — a proximity guess produces a wrong pronoun on a line that looks fine. A relationship QA rule simply does not fire on an unresolved line.
 
-## Gender-marked speech (Thai)
+## Gender-marked speech
 
-When `language_id` is `thai`, the prompt and QA both know the gender grammar (`GENDER_GRAMMAR` in `characters.py`):
+Languages that inflect the speaker's own words by the speaker's gender are built in (`GENDER_GRAMMAR` in `characters.py`, keyed by `language_id`; Thai is the only one so far, with its rules in [locales/thai.md](locales/thai.md)). The prompt and QA read the same table:
 
-- **male** speakers must not use `ค่ะ` / `คะ` / `นะคะ` / `ดิฉัน`; **female** speakers must not use `ครับ`. (`คะ` only matches as a particle, so `คะแนน` is safe.)
-- **unknown gender, minor extras** (role contains `extra`/`background`/`minor`/`crowd`) **and speakers with no record** must stay unisex — none of the above. These are category-2 findings (`Name: unisex speech`, `unknown speaker: gendered speech`).
+- A speaker's gender comes from the record's `gender`. **Unknown gender, minor extras** (role contains `extra`/`background`/`minor`/`crowd`) **and speakers with no record** must stay unisex. These are category-2 findings (`Name: unisex speech`, `unknown speaker: gendered speech`).
 - A text spoken by several characters (`also_spoken_by` in `strings.json`) is translated once, so the prompt marks it `shared_by` and asks for a unisex rendering when their genders differ; QA checks it against every speaker.
-- Opt a character out (e.g. a woman who speaks with `ครับ` on purpose) with `"gender_grammar": false` on the record.
+- Opt a character out with `"gender_grammar": false` on the record.
 
 ## Fixing individual lines
 After an audit finds a few bad lines, fix them with `edit_lines.py` (dry-run first; it backs up, applies the validity gate, and warns when a dictionary entry is shared with lines you are not editing). Confirm the fix in the running game: `references/verify-in-engine.md`.
@@ -166,8 +165,8 @@ Also run `find_twins.py --profile profile.json` before building: it fails while 
 ## Pair audit and punctuation policy
 - **Two-speaker runs.** Register errors that belong to a *pair* (two friends sharing one fixed pronoun set) slip past speaker-only rules. Declare `"pairs": [{"name", "between": [A, B], "forbid": regex, "min_run": 3, "skip_labels": []}]` in the `qa_rules_file` and run `pair_audit.py --profile profile.json` (needs a `--no-dedupe` extract). It lists lines of every A/B-only run that match the forbidden form. Expect false positives to filter by eye: role-play, flashbacks, quoted text, a character playing someone else. It reads script order and never feeds addressee resolution (ADR-020).
 - **Exclamation marks.** Add `"punctuation": {"exclamation": {}}` to the profile to opt in. `qa_check.py` then reports how many lines carry a `!` the policy would drop (informational); `punctuation.py` previews and applies the softening. The rule is form-based, so review the dry-run for shouted lower-case lines.
-- **Chinese conventions.** For a Chinese target QA adds `zh variant` / `zh halfwidth` / `zh ellipsis` / `zh space` findings `orthography.py --write` fixes the last three, and `translate_api.py --repair-variant` repairs a `zh variant` leak. See `chinese.md`.
-- **Thai edits.** Use `thai_text.replace_word` in edit scripts rather than `\b` or `[ะ-์]` lookarounds: Thai has no spaces and that range contains the leading vowels เ แ โ ใ ไ.
+- **Writing conventions.** For a language with a module in `scripts/langs/` (Chinese today) QA adds its findings, `orthography.py --write` fixes the mechanical ones, and the locale file lists them: [locales/chinese.md](locales/chinese.md).
+- **Language-specific edit helpers** live in the locale file (Thai: `thai_text.replace_word`, see [locales/thai.md](locales/thai.md)).
 
 ## Speaker overrides
 

@@ -29,7 +29,7 @@ The generated filter contains nothing game-specific on its own. These profile ke
 | `input_sync` | `[{"prompt": "What is your name?", "vars": {"short": "name[:2]"}}]` — after the player types, recompute variables from `name` (games that precompute forms of the protagonist's name) |
 | `store_defaults` | `{var: value}` seeded when undefined, so **scene replays** (gallery) don't `NameError` on variables only set during play. List only names the game never `default`s — a seeded name makes Ren'Py's own `default` skip it |
 | `safe_store_files` | `["gallery"]` — a missing store variable read from a frame in a file with this substring returns `""` instead of raising |
-| `font.text_size` | cap dialogue size (Thai often needs ~28) |
+| `font.text_size` | cap dialogue size (see the language's locale file) |
 
 Run `python replay_vars.py --src decompiled/ [--json]` to list variables assigned only during play (the ones a replay will not have) with a neutral starting value each; confirm which your gallery touches. An `Uncaught Exception … has no attribute 'x'` in the gallery names any it missed. **Never hand-edit the generated `00_<lang>_filter.rpy`** — the next build overwrites it; put the change in the profile. Since v1.5.2 the file carries a `# build-hash:` line, and a build prints a `WARNING` if the file was edited after its last build.
 

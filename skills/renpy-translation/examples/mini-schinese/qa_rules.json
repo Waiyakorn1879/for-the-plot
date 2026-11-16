@@ -1,0 +1,20 @@
+{
+  "window": 12,
+  "roman_check": true,
+  "truncation_min_len": 20,
+  "groups": {
+    "faculty": [
+      "prof"
+    ]
+  },
+  "rules": [
+    {
+      "name": "professor does not use street slang",
+      "category": 2,
+      "speakers": [
+        "prof"
+      ],
+      "pattern": "老子|哥们|牛逼"
+    }
+  ]
+}

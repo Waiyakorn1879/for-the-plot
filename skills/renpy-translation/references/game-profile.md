@@ -77,13 +77,13 @@ One source word can need three different renderings depending on who says it to 
 
 Keep `translation-guide.md` for the *reasoning* and anything prose-shaped. Two `examples` per character reach the prompt; a `note` explaining **why** a rendering is right is worth more than a third example.
 
-**Chinese target?** Read `chinese.md` now: the script variant, punctuation and name policy are decided here, and the tools check them.
+**Locale file?** If [locales/](locales/README.md) has a file for the target language, read it now: the decisions it names (Chinese: which script) are made here, and the tools check them.
 
 **3. Build the keep-untranslated list.** Character names, place names, faction/club names, branded mechanics. These go in `profile.json` `keep_untranslated` (which also whitelists them for QA's untranslated-word check).
 
 **4. Set the slang/profanity policy.** Translate intent, not words: list the source game's recurring profanity and idioms with target-language equivalents by context. State explicitly that NSFW register must not be sanitized (or whatever the user wants).
 
-**5. Pick fonts (non-Latin targets).** Find a font covering the target script with a license that allows redistribution (e.g. SIPA/national fonts for Thai, Noto for almost everything). Test it at the game's dialog size; if it renders smaller than the original font, set `font.size_scale` (Thai TH Krub needed 1.3). List the game's original font files (from `gui.rpy`/`gui.rpa`) in `font.replace_fonts`. **Don't commit font files to a repo — link to their source.**
+**5. Pick fonts (non-Latin targets).** Find a font covering the target script with a license that allows redistribution (Noto covers almost everything; the locale file lists known-good choices). Test it at the game's dialog size; if it renders smaller than the original font, set `font.size_scale` (the Thai project needed 1.3, see [locales/thai.md](locales/thai.md)). List the game's original font files (from `gui.rpy`/`gui.rpa`) in `font.replace_fonts`. **Don't commit font files to a repo — link to their source.**
 
 **6. Decide toggle/auto-set.** If the game's Preferences has no language picker, set `auto_set_language: true` and a `toggle_key` so players can flip languages in-game.
 

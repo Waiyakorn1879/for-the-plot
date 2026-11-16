@@ -42,4 +42,4 @@ After extraction, grep the sources for `renpy.say`, list-of-strings assignments,
 ## What the extractor tells you (v1.5.2)
 
 - **Say grammar.** Attributes (`a happy "Hi"`) and trailers (`with dissolve`, `nointeract`, `id x`, `(args)`) are all accepted. A dialogue-shaped line that still matches nothing is printed as `WARNING: … NOT extracted` — read it before translating; a skipped line is never seen by QA.
-- **Shared texts.** Dedupe keeps one entry per text; if several characters say it, the entry carries `also_spoken_by`. One translation serves all of them, so the translator is told to write it neutrally when their genders differ (Thai), and QA checks it against every speaker.
+- **Shared texts.** Dedupe keeps one entry per text; if several characters say it, the entry carries `also_spoken_by`. One translation serves all of them, so the translator is told to write it neutrally when their genders differ (languages with gendered speech), and QA checks it against every speaker.

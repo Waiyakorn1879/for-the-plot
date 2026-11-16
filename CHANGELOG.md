@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.3
+
+Structure for more languages. No behaviour change; every command and import keeps its name.
+
+- **Locale files:** language-specific guidance now lives in `references/locales/` (an index, `thai.md`, `chinese.md`, `chinese-simplified.md`, `chinese-traditional.md`). `SKILL.md`, `PLAYBOOK.md` and the phase references keep one generic "read the locale file" instruction instead of a section per language, and `init_project.py` prints the files to read for the language it scaffolds. `references/chinese.md` moved to `references/locales/chinese.md`, and the Thai passages scattered through `qa.md`, `game-profile.md`, `patching.md` and `extraction.md` were consolidated into `thai.md`.
+- **`scripts/langs/`:** each language's writing conventions is a module behind a small contract (documented in `langs/__init__.py`). Chinese moved to `langs/zh.py`; `orthography.py` stays the entry point, CLI and import, and dispatches. Adding a language touches its own module, its locale file and the registry, and no other script. A test registers a second, toy language to prove it.
+- **`examples/mini-schinese/`:** a worked Chinese example (profile, style guide, QA rules) built on the synthetic test fixture, with no game text. A test runs it end to end.
+
 ## 1.6.2
 
 Fixes from a review of the 1.6.1 tools. No data format changes. QA is stricter, so a project that passed before may now report issues that were always there.
