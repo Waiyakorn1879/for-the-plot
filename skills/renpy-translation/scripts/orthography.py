@@ -17,8 +17,9 @@ What is checked for a Chinese target:
   python orthography.py --profile profile.json --write   # backs up, then fixes
 
 --write fixes halfwidth, ellipsis and space only. A variant leak is REPORTED,
-never converted: Simplified -> Traditional is one-to-many (发 is 發 or 髮) and
-needs a real converter or a person. Tokens are masked while editing and every
+never converted here: Simplified -> Traditional is one-to-many (发 is 發 or 髮)
+and the standard library has no conversion data. `translate_api.py
+--repair-variant` repairs those lines with the model, behind the same gates. Tokens are masked while editing and every
 result is held to the validity gate.
 
 The variant comes from the language id (`schinese`, `tchinese`, `zh_cn` ...) or
@@ -288,7 +289,7 @@ def main():
 
     print(f"Chinese conventions (variant: {cfg['variant'] or 'not set'})")
     for name in ("variant", "halfwidth", "ellipsis", "space"):
-        note = "  (reported only; never auto-converted)" if name == "variant" else ""
+        note = "  (reported only; translate_api.py --repair-variant fixes it)" if name == "variant" else ""
         print(f"  {name:<10}{counts.get(name, 0):6d} entr(ies){note}")
     if not cfg["variant"]:
         print('  variant is not checked: set "orthography": {"variant": "simplified"} '
