@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>For the Plot — Ren'Py visual novel translation workflow</title>
+<meta name="description" content="Free, open-source workflow and Python tools for translating Ren'Py visual novels into Thai, Chinese and other languages: extract, translate, QA and build a drop-in patch. Works with Claude Code or any AI assistant.">
+<link rel="canonical" href="https://waiyakorn1879.github.io/for-the-plot/">
+<meta property="og:title" content="For the Plot — Ren'Py visual novel translation workflow">
+<meta property="og:description" content="Extract, translate, QA and patch Ren'Py visual novels. Thai and Chinese support, character-aware speech registers, token-safe.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://waiyakorn1879.github.io/for-the-plot/">
+<style>
+:root{--bg:#fff;--fg:#1c1d22;--muted:#5a5f6b;--accent:#b4235a;--card:#f5f5f8;--line:#e2e3ea}
+@media (prefers-color-scheme:dark){:root{--bg:#14151a;--fg:#ececf1;--muted:#a3a7b3;--accent:#ff7fb0;--card:#1e1f27;--line:#2d2f3a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:46rem;margin:0 auto;padding:2.5rem 1rem 4rem}
+h1{font-size:2rem;margin:0 0 .25rem}
+h2{font-size:1.25rem;margin:2.2rem 0 .6rem}
+.tag{color:var(--accent);font-weight:600;margin:0 0 1.2rem}
+p,li{color:var(--fg)}
+.muted{color:var(--muted)}
+pre{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.8rem 1rem;overflow-x:auto;font-size:.9rem}
+code{font-family:ui-monospace,Consolas,monospace}
+a{color:var(--accent)}
+.cta{display:flex;flex-wrap:wrap;gap:.6rem;margin:1.2rem 0}
+.cta a{border:1px solid var(--accent);border-radius:8px;padding:.5rem .9rem;text-decoration:none;font-weight:600}
+.cta a:first-child{background:var(--accent);color:var(--bg)}
+ul{padding-left:1.2rem}
+footer{margin-top:3rem;font-size:.875rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>For the Plot</h1>
+<p class="tag">You came for the porn. We translated the plot.</p>
+<p>A complete fan-translation workflow for <strong>Ren'Py visual novels</strong>: plain Python tools plus a written procedure that takes a game from archive to a drop-in language patch. It ships as a <a href="https://claude.com/claude-code">Claude Code</a> plugin, but any AI assistant, or a person, can follow it end to end.</p>
+<div class="cta">
+<a href="https://github.com/Waiyakorn1879/for-the-plot">View on GitHub</a>
+<a href="https://github.com/Waiyakorn1879/for-the-plot/releases/latest">Latest release</a>
+<a href="https://github.com/Waiyakorn1879/for-the-plot/blob/main/skills/renpy-translation/PLAYBOOK.md">Read the playbook</a>
+</div>
+
+<h2>The pipeline</h2>
+<pre><code>decompile → extract strings → build a game profile
+→ translate → QA → build patch → deploy</code></pre>
+
+<h2>What it does</h2>
+<ul>
+<li><strong>Token-safe.</strong> Every <code>[variable]</code>, <code>{tag}</code> and escape in the source must survive into the translation, with tag nesting checked, so a line never crashes the game.</li>
+<li><strong>Character-aware.</strong> Per-character speech registers and per-pair pronouns for languages like Thai, where the right word depends on who is speaking to whom.</li>
+<li><strong>Thai and Chinese.</strong> Built-in conventions for Simplified and Traditional Chinese (punctuation, script purity, Mainland and Taiwan vocabulary) and locale guidance for Thai.</li>
+<li><strong>No source edits.</strong> The patch lives in its own folder and uninstalls by deleting it.</li>
+<li><strong>Bulk or by hand.</strong> Use an API provider (DeepSeek, OpenAI-compatible, Gemini, Anthropic, Claude Code CLI) for a first pass, or translate in your own session. A translation cache makes repeats and game updates free.</li>
+<li><strong>Stdlib only.</strong> Python 3.8+, no required dependencies, tested in CI.</li>
+</ul>
+
+<h2>Install</h2>
+<p>In Claude Code:</p>
+<pre><code>/plugin marketplace add Waiyakorn1879/for-the-plot
+/plugin install for-the-plot@for-the-plot</code></pre>
+<p>Using another tool? Clone the repository and point your assistant at <a href="https://github.com/Waiyakorn1879/for-the-plot/blob/main/AGENTS.md"><code>AGENTS.md</code></a>.</p>
+
+<h2>Proven on real games</h2>
+<p>The workflow was built on full Thai translations of <em>Being a DIK</em> and <em>Eternum</em>. The repository includes a trimmed <em>Eternum</em> Thai profile as a worked example, and a synthetic Simplified Chinese example. No game text is published.</p>
+
+<footer>
+<p>For the Plot is open source (see the <a href="https://github.com/Waiyakorn1879/for-the-plot/blob/main/LICENSE">license</a>). It contains tools and style guides only; it does not distribute any game's scripts or translations.</p>
+</footer>
+</main>
+</body>
+</html>
