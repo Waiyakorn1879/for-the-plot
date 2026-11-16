@@ -102,9 +102,11 @@ What guarantees the pipeline actually makes, stated honestly — believing in a 
 5. **Atomic writes.** The progress store, the TM, extracted strings, generated patch files, and QA reports are all written via temp-file + replace. An interrupted run cannot leave a truncated file.
 6. **The game install is never modified.** The patch is the only artifact that crosses over, and deleting one folder uninstalls it.
 
+7. **A store is copied aside before a tool rewrites it.** `translate_api.py` (first write of a run that changes anything; `--no-backup` to skip), `edit_lines.py --write` and `punctuation.py --write` each leave a `<file>.bak-<timestamp>` beside the original and never overwrite an earlier one. Backups are game text: the scaffolded `.gitignore` excludes them, and they are yours to delete.
+
 **Not yet implemented — plan around these (roadmap v1.8):**
 
-- **No pristine backup and no `restore` command.** Manual workaround: copy `translations.json` before any bulk run.
+- **No `restore` command, and no backup for in-session edits or `speaker_overrides.py merge`.** Restoring is a manual copy of a `.bak-*` file back over the store. Before a long in-session stretch, copy `translations.json` yourself.
 - **No round-trip verification before write.** The patch generator's escaping is not re-parsed and compared before the file lands.
 - **No failures store.** A batch that fails twice is reported to the console and then forgotten; nothing durable records *why* a string is still untranslated.
 

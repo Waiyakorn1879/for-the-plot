@@ -333,7 +333,7 @@ class TestValidateBeforePersist:
         "api": {"provider": "stub", "batch_size": 10},
     }
 
-    def _run(self, tmp_path, monkeypatch, reply, tm_seed=None):
+    def _run(self, tmp_path, monkeypatch, reply, tm_seed=None, argv=()):
         import json as _json
         (tmp_path / "strings.json").write_text(
             _json.dumps(self.STRINGS, ensure_ascii=False), encoding="utf-8")
@@ -357,7 +357,7 @@ class TestValidateBeforePersist:
         monkeypatch.setattr(translate_api.time, "sleep", lambda *_: None)
         monkeypatch.setattr(
             translate_api.sys, "argv",
-            ["translate_api.py", "--profile", str(tmp_path / "profile.json")])
+            ["translate_api.py", "--profile", str(tmp_path / "profile.json"), *argv])
         translate_api.main()
 
         progress = _json.loads((tmp_path / "tr.json").read_text(encoding="utf-8"))
@@ -414,6 +414,31 @@ class TestValidateBeforePersist:
         assert progress == {}
         out = capsys.readouterr().out
         assert "Rejected (not saved, not cached): 1" in out and "MISSING" in out
+
+    def test_progress_is_backed_up_once_before_a_run_changes_it(self, tmp_path, monkeypatch):
+        import json as _json
+        baks = lambda: sorted(tmp_path.glob("tr.json.bak-*"))
+        # first run: there was nothing to lose, so nothing is copied
+        self._run(tmp_path, monkeypatch, [{"id": 0, "tr": "สวัสดี"}])
+        assert baks() == []
+        # finished project re-run: no write, no backup
+        self._run(tmp_path, monkeypatch, [])
+        assert baks() == []
+        # a run that will change existing work copies it aside first
+        old = {"Old line.": "เก่า"}
+        (tmp_path / "tr.json").write_text(_json.dumps(old, ensure_ascii=False), encoding="utf-8")
+        (tmp_path / ".ftp" / "translation_memory.json").unlink()
+        progress, _, _ = self._run(tmp_path, monkeypatch, [{"id": 0, "tr": "สวัสดี"}])
+        assert len(baks()) == 1
+        assert _json.loads(baks()[0].read_text(encoding="utf-8")) == old
+        assert progress == {**old, "Hello there.": "สวัสดี"}
+
+    def test_no_backup_flag(self, tmp_path, monkeypatch):
+        import json as _json
+        (tmp_path / "tr.json").write_text(_json.dumps({"Old line.": "เก่า"}, ensure_ascii=False),
+                                          encoding="utf-8")
+        self._run(tmp_path, monkeypatch, [{"id": 0, "tr": "สวัสดี"}], argv=["--no-backup"])
+        assert list(tmp_path.glob("tr.json.bak-*")) == []
 
     def test_wrong_script_reply_reaches_neither_store(self, tmp_path, monkeypatch):
         progress, entries, _ = self._run(

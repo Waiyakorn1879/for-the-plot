@@ -10,6 +10,8 @@ __pycache__/
 *.rpyc
 translations.json
 *_translations.json
+*_translations_todo.json
+*.bak-*
 strings.json
 .ftp/
 decompiled/
