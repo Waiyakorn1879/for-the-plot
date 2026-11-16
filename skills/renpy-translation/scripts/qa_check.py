@@ -43,7 +43,7 @@ import terminology
 from relationships import build_resolver
 from validation import (
     ESC_RE, PCT_RE, TAG_RE, VAR_RE,
-    configure_console, multiset_diff, policy_banner, validate_translation,
+    configure_console, multiset_diff, norm_key, policy_banner, validate_translation,
     validation_policy, write_text_atomic,
 )
 
@@ -145,6 +145,49 @@ def near_condition_met(rule, ctx, groups, s, speakers=None):
     return True
 
 
+def technical_issues(text, tr, policy):
+    """-> (labels, untranslated): every category-1 finding for one translation.
+
+    One function for the dictionary and for speaker overrides, so the line a
+    player actually sees is held to the same standard whichever store it
+    came from.
+    """
+    labels = []
+    # Output validity: the same gate translate_api.py refuses to save on,
+    # so a hand-written or pre-1.3.1 translation is held to one standard.
+    ok, code = validate_translation(text, tr, policy)
+    if not ok:
+        labels.append("UNTRANSLATED" if code == "ECHO" else code if code != "TERM"
+                      else "TERM:" + terminology.explain(text, tr, policy["terms"]))
+
+    # Multiset, not set difference: a translation that ADDS or DUPLICATES
+    # a tag is just as broken as one that drops it.
+    for label, rx in (("TAG", TAG_RE), ("VAR", VAR_RE), ("ESC", ESC_RE)):
+        missing, extra = multiset_diff(rx.findall(text), rx.findall(tr))
+        if missing:
+            labels.append(f"{label}:{','.join(sorted(missing))}")
+        if extra:
+            labels.append(f"{label}+:{','.join(sorted(extra))}")
+
+    en_pct, tr_pct = len(PCT_RE.findall(text)), len(PCT_RE.findall(tr))
+    if en_pct != tr_pct:
+        labels.append(f"PCT:{en_pct}->{tr_pct}")
+    return labels, not ok
+
+
+def load_overrides(profile, base):
+    """-> {(speaker code, text): translation} from the speaker overrides file.
+
+    Keyed exactly as build_patch.py emits them and the runtime filter looks
+    them up, so QA judges the same entries the player will see.
+    """
+    path = base / profile.get("speaker_translations_file", "speaker_translations.json")
+    if not path.is_file():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return {tuple(k.split("::", 1)): v for k, v in raw.items() if "::" in k}
+
+
 def main():
     ap = argparse.ArgumentParser(description="QA check a Ren'Py translation project")
     ap.add_argument("--profile", required=True, help="profile.json")
@@ -208,6 +251,11 @@ def main():
     policy = validation_policy(profile, base)
 
     categories = defaultdict(list)  # category label -> issue tuples
+    # The dictionary may spell a key the other way round (escaped quote, curly
+    # apostrophe); edit_lines and pair_audit already find it, so QA must too.
+    trans_alt = {norm_key(k): (k, v) for k, v in trans.items()}
+    overrides = load_overrides(profile, base)
+    override_at = {}    # (speaker code, text) -> first (file, line) that says it
     bang_policy = punctuation.policy(profile)
     bang_over = 0
 
@@ -219,36 +267,23 @@ def main():
         # Findings name the pair when one was resolved, so a category-3 hit is
         # traceable to the relationship it was judged against.
         speaker = f"{speaker}→{target}" if target else speaker
-        tr = trans.get(text)
+        # `stored` is the key as the dictionary spells it. Tokens are compared
+        # against that spelling: a value mirrors its own key's quote escaping.
+        stored, tr = text, trans.get(text)
+        if tr is None:
+            stored, tr = trans_alt.get(norm_key(text), (text, None))
+        if overrides:
+            for code in [s["speaker"]] + list(s.get("also_spoken_by") or []):
+                override_at.setdefault((code, text), (file, line))
 
         # ── Category 1: Technical ──────────────────────────────────────────
         if tr is None or tr.strip() == "":
             categories[1].append(("MISSING", speaker, file, line, text, tr or ""))
             continue
 
-        # Output validity: the same gate translate_api.py refuses to save on,
-        # so a hand-written or pre-1.3.1 translation is held to one standard.
-        ok, code = validate_translation(text, tr, policy)
-        untranslated = not ok
-        if untranslated:
-            label = ("UNTRANSLATED" if code == "ECHO" else code if code != "TERM"
-                     else "TERM:" + terminology.explain(text, tr, policy["terms"]))
+        labels, untranslated = technical_issues(stored, tr, policy)
+        for label in labels:
             categories[1].append((label, speaker, file, line, text, tr))
-
-        # Multiset, not set difference: a translation that ADDS or DUPLICATES
-        # a tag is just as broken as one that drops it.
-        for label, rx in (("TAG", TAG_RE), ("VAR", VAR_RE), ("ESC", ESC_RE)):
-            missing, extra = multiset_diff(rx.findall(text), rx.findall(tr))
-            if missing:
-                categories[1].append((f"{label}:{','.join(sorted(missing))}",
-                                      speaker, file, line, text, tr))
-            if extra:
-                categories[1].append((f"{label}+:{','.join(sorted(extra))}",
-                                      speaker, file, line, text, tr))
-
-        en_pct, tr_pct = len(PCT_RE.findall(text)), len(PCT_RE.findall(tr))
-        if en_pct != tr_pct:
-            categories[1].append((f"PCT:{en_pct}->{tr_pct}", speaker, file, line, text, tr))
 
         if args.technical_only:
             continue
@@ -258,9 +293,13 @@ def main():
 
         # ── Declarative register/phrasing rules ────────────────────────────
         # A deduplicated text shared by several speakers is judged against each.
-        judged = [(canon_speaker, target)] + [
-            (canon(speakers, o), None) for o in s.get("also_spoken_by", [])]
-        for rule, (rule_spk, rule_tgt) in ((r, j) for r in rules for j in judged):
+        # Each is judged on what the player will see from THAT speaker: their
+        # override when one exists (the runtime filter prefers it), else the
+        # dictionary entry.
+        judged = [(canon_speaker, target, overrides.get((s["speaker"], text), tr))] + [
+            (canon(speakers, o), None, overrides.get((o, text), tr))
+            for o in s.get("also_spoken_by", [])]
+        for rule, (rule_spk, rule_tgt, seen_tr) in ((r, j) for r in rules for j in judged):
             if rule["_speakers"] is not None and rule_spk not in rule["_speakers"]:
                 continue
             if rule.get("unknown_speakers") and (
@@ -271,17 +310,17 @@ def main():
                 continue
             if rule.get("skip_monologue") and is_monologue(text):
                 continue
-            if not rule["_re"].search(tr):
+            if not rule["_re"].search(seen_tr):
                 continue
             if not near_condition_met(rule, ctx, groups, s, speakers):
                 continue
             cat = rule.get("category", 4)
             if rule.get("dedupe", True):
-                key = (rule["name"], text)
+                key = (rule["name"], text, seen_tr)
                 if key in rule.setdefault("_seen", set()):
                     continue
                 rule["_seen"].add(key)
-            categories[cat].append((rule["name"], speaker if rule_spk == canon_speaker else rule_spk, file, line, text, tr))
+            categories[cat].append((rule["name"], speaker if rule_spk == canon_speaker else rule_spk, file, line, text, seen_tr))
 
         # ── Category 4 built-ins: phrasing review flags ────────────────────
         # An echoed line is 100% Latin by definition; reporting it again as a
@@ -303,6 +342,15 @@ def main():
             if absent:
                 categories[4].append((f"must_use?:{','.join(absent[:3])}",
                                       speaker, file, line, text, tr))
+
+    # ── Speaker overrides: category 1 ───────────────────────────────────────
+    # Every override ships and wins over the dictionary at runtime, so each one
+    # is checked — including one no extracted line maps to any more.
+    for (code, text), otr in overrides.items():
+        file, line = override_at.get((code, text), ("(speaker override)", 0))
+        labels = technical_issues(text, otr, policy)[0] if otr and otr.strip() else ["EMPTY"]
+        for label in labels:
+            categories[1].append((f"OVERRIDE {label}", code, file, line, text, otr or ""))
 
     # ── Report ──────────────────────────────────────────────────────────────
     out = io.StringIO()
@@ -339,6 +387,8 @@ def main():
         if resolver.unknown_speakers:
             emit(f"  {len(resolver.unknown_speakers)} speaker code(s) have no "
                  f"character record — run relationships.py to list them.")
+    if overrides:
+        emit(f"  Speaker overrides: {len(overrides)} checked")
     if bang_policy and not args.technical_only:
         emit(f"  Exclamation policy: {bang_over} line(s) carry a '!' the policy would drop "
              "(run punctuation.py; informational, not a failure)")

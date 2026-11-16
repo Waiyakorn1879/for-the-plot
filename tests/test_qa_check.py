@@ -551,3 +551,54 @@ def test_thai_shared_text_neutral_for_mixed_genders(tmp_path):
     proc = run_qa(tmp_path, [entry], {"Hi!": "สวัสดี!"},
                   profile_extra={"language_id": "thai", "speakers": THAI_SPEAKERS})
     assert "speech" not in proc.stdout.split("CAT 2")[1].split("CAT 3")[0]
+
+
+# ---- speaker overrides are what the player sees: QA must judge them ----------
+
+def override_qa(tmp_path, overrides, tr="ขอบคุณ", extra=None, *args):
+    entry = say("Thanks [n].", "an", 1)
+    entry["also_spoken_by"] = ["mc"]
+    (tmp_path / "speaker_translations.json").write_text(
+        json.dumps(overrides, ensure_ascii=False), encoding="utf-8")
+    return run_qa(tmp_path, [entry], {"Thanks [n].": tr + " [n]"}, None,
+                  {"language_id": "thai", "language_name": "Thai", "speakers": THAI_SPEAKERS,
+                   "validation": {"target_script": "thai"}, **(extra or {})}, *args)
+
+
+def test_override_technical_faults_are_category_1(tmp_path):
+    proc = override_qa(tmp_path, {
+        "an::Thanks [n].": "Thanks [n].",            # echo
+        "mc::Thanks [n].": "ขอบคุณ {b}",              # lost [n], added {b}
+        "zz::Gone line.": "   "}, "ขอบคุณ", None, "--technical-only")
+    out = proc.stdout
+    assert proc.returncode == 1
+    for label in ("OVERRIDE UNTRANSLATED", "OVERRIDE VAR:[n]", "OVERRIDE TAG+:{b}",
+                  "OVERRIDE EMPTY"):
+        assert label in out, label
+    assert "Speaker overrides: 3 checked" in out
+
+
+def test_override_is_judged_by_its_own_speakers_register(tmp_path):
+    # mc is male: his override must not use the female particle.
+    proc = override_qa(tmp_path, {"mc::Thanks [n].": "ขอบคุณค่ะ [n]"})
+    assert proc.returncode == 1 and "Max: male speech" in proc.stdout
+
+
+def test_override_replaces_the_dictionary_text_for_that_speaker(tmp_path):
+    # The shared entry is female; mc's override fixes it for him, and an's
+    # line (no override) is still judged on the dictionary text.
+    proc = override_qa(tmp_path, {"mc::Thanks [n].": "ขอบคุณครับ [n]"}, tr="ขอบคุณค่ะ")
+    assert proc.returncode == 0, proc.stdout
+    proc = override_qa(tmp_path, {}, tr="ขอบคุณค่ะ")
+    assert proc.returncode == 1 and "Max: male speech" in proc.stdout
+
+
+def test_no_overrides_file_leaves_the_report_header_alone(tmp_path):
+    proc = run_qa(tmp_path, STRINGS, TRANSLATIONS)
+    assert "Speaker overrides" not in proc.stdout and "OVERRIDE" not in proc.stdout
+
+
+def test_key_spelled_the_other_way_is_not_missing(tmp_path):
+    strings = [say('He said \\"hi\\".', "mc", 1), say("It’s late.", "mc", 2)]
+    proc = run_qa(tmp_path, strings, {'He said "hi".': 'είπε "γεια".', "It's late.": "είναι αργά."})
+    assert "MISSING" not in proc.stdout and proc.returncode == 0, proc.stdout

@@ -23,7 +23,7 @@ import re
 from pathlib import Path
 
 from validation import (MASK_SRC, backup_file, configure_console, is_echo, mask_tokens, unmask_tokens,
-                        write_text_atomic)
+                        validate_translation, validation_policy, write_text_atomic)
 
 
 def _read(path, default):
@@ -76,6 +76,31 @@ def over_policy(source, translation, cfg):
             and not keep(source, cfg))
 
 
+def apply_policy(stores, cfg, gate_policy):
+    """Soften every over-policy entry of `stores` in place.
+    -> ({path: entries changed}, marks removed, entries skipped).
+
+    A softened result is held to the validity gate before it replaces anything:
+    a translation that was nothing but `!` would otherwise be saved empty.
+    """
+    changed, marks, skipped = {}, 0, 0
+    for path, d, source_of in stores:
+        for k, v in d.items():
+            src = source_of(k)
+            if not over_policy(src, v, cfg):
+                continue
+            new = soften(v)
+            if new == v:
+                continue
+            if not validate_translation(src, new, gate_policy)[0]:
+                skipped += 1
+                continue
+            changed[path] = changed.get(path, 0) + 1
+            marks += v.count("!") - new.count("!")
+            d[k] = new
+    return changed, marks, skipped
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--profile", required=True)
@@ -92,20 +117,13 @@ def main():
     stores = [(tr_path, _read(tr_path, {}), lambda k: k),
               (sp_path, _read(sp_path, {}), lambda k: k.split("::", 1)[-1])]
 
-    changed = marks = 0
-    touched = set()
-    for path, d, source_of in stores:
-        for k, v in d.items():
-            src = source_of(k)
-            if over_policy(src, v, cfg):
-                new = soften(v)
-                if new != v:
-                    changed += 1
-                    touched.add(path)
-                marks += v.count("!") - new.count("!")
-                d[k] = new
+    changed, marks, skipped = apply_policy(stores, cfg, validation_policy(profile, base))
+    touched = {path for path, _, _ in stores if path in changed}
     left = sum(v.count("!") for _, d, _ in stores for v in d.values())
-    print(f"{changed} entr(ies) to change, {marks} mark(s) removed, {left} remain")
+    print(f"{sum(changed.values())} entr(ies) to change, {marks} mark(s) removed, {left} remain")
+    if skipped:
+        print(f"{skipped} entr(ies) left alone: softening would fail the validity gate "
+              "(e.g. a translation that is only '!')")
     if not args.write:
         print("dry-run: nothing written (use --write)")
         return

@@ -22,7 +22,8 @@ import re
 import sys
 from pathlib import Path
 
-from validation import configure_console, write_text_atomic
+from validation import (ESC_RE, PCT_RE, TAG_RE, VAR_RE, configure_console, multiset_diff,
+                        validate_translation, validation_policy, write_text_atomic)
 
 configure_console()
 
@@ -496,6 +497,28 @@ init 2002 python:
     return "".join(parts)
 
 
+def gate_overrides(speaker_translations, policy):
+    """-> (kept, dropped [(speaker, text, reason)]).
+
+    An override wins over the dictionary at runtime, so a bad one is worse than
+    none: dropping it falls back to the dictionary's own translation, which is
+    always safe. Same gate as `speaker_overrides.py merge` and qa_check.py.
+    """
+    kept, dropped = {}, []
+    for (spk, eng), tr in speaker_translations.items():
+        ok, reason = validate_translation(eng, tr, policy)
+        if ok:
+            for label, rx in (("TAG", TAG_RE), ("VAR", VAR_RE), ("ESC", ESC_RE), ("PCT", PCT_RE)):
+                if any(multiset_diff(rx.findall(eng), rx.findall(tr))):
+                    ok, reason = False, label
+                    break
+        if ok:
+            kept[(spk, eng)] = tr
+        else:
+            dropped.append((spk, eng, reason))
+    return kept, dropped
+
+
 def build_dict_rpy(translations, ident, lang_name, chunk=None, speaker_translations=None):
     """Yield (filename_suffix, content) for one or more dict files."""
     items = list(translations.items())
@@ -607,7 +630,14 @@ def main():
             if "::" in k:
                 spk, eng = k.split("::", 1)
                 speaker_translations[(spk, eng)] = v
+        speaker_translations, dropped = gate_overrides(
+            speaker_translations, validation_policy(profile, base))
         print(f"Loaded {len(speaker_translations)} character-specific overrides from {speaker_path.name}")
+        if dropped:
+            print(f"WARNING: {len(dropped)} override(s) NOT shipped (those lines use the "
+                  f"dictionary translation instead) - run qa_check.py:")
+            for spk, eng, reason in dropped[:10]:
+                print(f"  [{reason}] {spk}::{eng[:60]}")
 
     for fi, content in build_dict_rpy(dict_translations, ident, lang_name, args.split_size, speaker_translations):
         dict_path = out_dir / f"{fi + 1:02d}_{ident}_dict.rpy"

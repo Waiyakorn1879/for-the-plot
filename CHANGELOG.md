@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.6.2
+
+Fixes from a review of the 1.6.1 tools. No data format changes. QA is stricter, so a project that passed before may now report issues that were always there.
+
+- **`qa_check.py` judges speaker overrides.** `speaker_translations.json` was never read by QA, so an echoed or token-damaged override passed and shipped — and overrides win over the dictionary at runtime. Every override now gets the category-1 checks (reported as `OVERRIDE ...`), and register rules judge each speaker on their override when they have one.
+- **`build_patch.py` does not ship an override that fails the gate.** It is dropped with a warning and the line falls back to the dictionary translation.
+- **`punctuation.py --write` can no longer save an empty translation.** A softened result is held to the validity gate; entries that would fail are left alone and counted.
+- **`translate_api.py`:** a transport error during the retry call no longer aborts the run and loses the batch's accepted lines. Lines the model left out or whose tokens changed are now counted in the summary (`MISSING`, `TOKEN`) instead of being skipped silently.
+- **`qa_check.py` finds a key spelled the other way** (escaped quote, curly apostrophe), as `edit_lines.py` and `pair_audit.py` already did, instead of reporting it MISSING.
+- **`edit_lines.py` exits 1 when an edit is REJECTED** (edits that pass are still applied), matching `speaker_overrides.py merge`.
+- **`find_twins.py` also checks the speaker overrides file.**
+
 ## 1.6.1
 
 Tooling from a second full-game (Thai) translation. No data format changes; every new key is optional.

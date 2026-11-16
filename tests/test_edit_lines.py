@@ -75,3 +75,23 @@ def test_backups_never_overwrite_each_other(tmp_path):
     f.write_text("two")
     b = backup_file(f)
     assert a != b and a.read_text() == "one" and b.read_text() == "two"
+
+
+def code(tmp_path, *extra):
+    return subprocess.run([sys.executable, str(SCRIPTS_DIR / "edit_lines.py"),
+                           "--profile", str(tmp_path / "profile.json"),
+                           "--jobs", str(tmp_path / "jobs.json"), *extra],
+                          capture_output=True, text=True, encoding="utf-8").returncode
+
+
+def test_rejected_edit_fails_the_run_but_good_edits_still_land(tmp_path):
+    jobs = [{"file": "a.rpy", "line": 1, "sub": [[r"\[x\]", ""]]},
+            {"file": "a.rpy", "line": 2, "sub": [["ฉัน", "ข้า"]]}]
+    tr = {"Hi [x].": "ฉัน [x]", "Go.": "ฉันไป"}
+    setup(tmp_path, [say("Hi [x].", "a", 1), say("Go.", "a", 2)], tr, jobs=jobs)
+    assert code(tmp_path) == 1                      # dry-run reports it too
+    assert code(tmp_path, "--write") == 1
+    assert json.loads((tmp_path / "tr.json").read_text(encoding="utf-8")) == {
+        "Hi [x].": "ฉัน [x]", "Go.": "ข้าไป"}
+    setup(tmp_path, [say("Go.", "a", 2)], {"Go.": "ฉันไป"}, jobs=jobs[1:])
+    assert code(tmp_path) == 0 and code(tmp_path, "--write") == 0
