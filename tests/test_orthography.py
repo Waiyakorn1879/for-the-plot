@@ -167,12 +167,79 @@ def test_scaffold_declares_the_variant(tmp_path):
         assert profile["language_name"] == name
         assert profile["validation"]["target_script"] == "chinese"
         assert "references/chinese.md" in proc.stdout
-    proc = subprocess.run([sys.executable, str(SCRIPTS_DIR / "init_project.py"),
-                           "--game", str(game), "--language", "chinese",
-                           "--dir", str(tmp_path / "zh")],
+    assert "script locked to traditional" in proc.stdout
+
+
+def scaffold(tmp_path, *args):
+    game = tmp_path / "Game-1.0-pc"
+    (game / "game").mkdir(parents=True, exist_ok=True)
+    return subprocess.run([sys.executable, str(SCRIPTS_DIR / "init_project.py"), "--game",
+                           str(game), "--dir", str(tmp_path / "zh"), *args],
                           capture_output=True, text=True, encoding="utf-8")
+
+
+def test_scaffold_refuses_to_guess_and_creates_nothing(tmp_path):
+    for lang in ("chinese", "zh", "mandarin"):
+        proc = scaffold(tmp_path, "--language", lang)
+        assert proc.returncode == 1 and "Ask the user" in proc.stderr
+        assert "schinese" in proc.stderr and "tchinese" in proc.stderr
+        assert not (tmp_path / "zh").exists(), "nothing is scaffolded before the choice"
+
+
+def test_scaffold_variant_flag_for_a_custom_id_and_for_contradictions(tmp_path):
+    proc = scaffold(tmp_path, "--language", "chinese", "--variant", "traditional")
+    assert proc.returncode == 0, proc.stderr
     profile = json.loads((tmp_path / "zh" / "profile.json").read_text(encoding="utf-8"))
-    assert "orthography" not in profile and "Simplified or Traditional is not known" in proc.stdout
+    assert profile["orthography"] == {"variant": "traditional"}
+    assert profile["language_name"] == "Traditional Chinese"
+    assert profile["validation"]["target_script"] == "chinese"
+    bad = scaffold(tmp_path / "other", "--language", "schinese", "--variant", "traditional")
+    assert bad.returncode == 1 and "A project has one script" in bad.stderr
+    fine = scaffold(tmp_path / "third", "--language", "tchinese", "--variant", "traditional")
+    assert fine.returncode == 0
+    # the flag means nothing for other languages
+    assert scaffold(tmp_path / "t", "--language", "thai", "--variant", "simplified").returncode == 0
+
+
+def test_problem_is_the_one_lock():
+    ok = {"language_id": "schinese", "orthography": {"variant": "simplified"}}
+    assert o.problem(ok) is None and o.problem({"language_id": "schinese"}) is None
+    assert "Ask the user" in o.problem({"language_id": "chinese"})
+    assert o.problem({"language_id": "chinese"}, need_variant=False) is None
+    assert "has one script" in o.problem({"language_id": "tchinese",
+                                          "orthography": {"variant": "simplified"}})
+    assert "has one script" in o.problem({"language_id": "tchinese",
+                                          "orthography": {"variant": "simplified"}}, need_variant=False)
+    assert o.problem({"language_id": "thai"}) is None
+    assert o.problem({"language_id": "chinese", "orthography": False}) is None
+    assert o.problem({"language_id": "chinese", "orthography": {"variant": "traditional"}}) is None
+
+
+def test_bulk_translation_stops_before_writing_when_the_script_is_not_settled(tmp_path, monkeypatch):
+    called = []
+    monkeypatch.setitem(translate_api.PROVIDERS, "stub",
+                        lambda p: (lambda s, u: called.append(u) or "[]"))
+    for lang, extra, needle in (("chinese", {}, "Ask the user"),
+                                ("tchinese", {"orthography": {"variant": "simplified"}}, "has one script")):
+        project(tmp_path, RAIN, language=lang, extra={"api": {"provider": "stub"}, **extra})
+        for flag in ([], ["--repair-variant"]):
+            monkeypatch.setattr(translate_api.sys, "argv", ["translate_api.py", "--profile",
+                                str(tmp_path / "profile.json"), *flag])
+            with pytest.raises(SystemExit) as e:
+                translate_api.main()
+            assert needle in str(e.value.code)
+    assert called == [] and read(tmp_path) == RAIN
+
+
+def test_qa_stops_on_a_contradiction_but_only_notes_an_unknown_script(tmp_path):
+    project(tmp_path, LINES, language="tchinese", extra={"orthography": {"variant": "simplified"}})
+    proc = run(tmp_path, "qa_check.py")
+    assert proc.returncode == 1 and "has one script" in proc.stderr and proc.stdout == ""
+    project(tmp_path, LINES, language="chinese")
+    proc = run(tmp_path, "qa_check.py")
+    assert proc.returncode == 0 and "variant=not set" in proc.stdout
+    proc = run(tmp_path, "orthography.py")
+    assert proc.returncode == 0 and "variant is not checked" in proc.stdout
 
 
 # ---- translate_api.py --repair-variant ----------------------------------------
@@ -267,11 +334,11 @@ def test_second_attempt_can_succeed(tmp_path, monkeypatch):
     assert read(tmp_path)["The rain kept falling."] == "雨还在下个不停。"
 
 
-def test_repair_needs_a_known_variant(tmp_path, monkeypatch):
-    project(tmp_path, RAIN, language="chinese", extra={"api": {"provider": "stub"}})
+def test_repair_is_for_chinese_only(tmp_path, monkeypatch):
+    project(tmp_path, RAIN, language="thai", extra={"api": {"provider": "stub"}})
     monkeypatch.setitem(translate_api.PROVIDERS, "stub", lambda p: (lambda s, u: "[]"))
     monkeypatch.setattr(translate_api.sys, "argv", ["translate_api.py", "--profile",
                         str(tmp_path / "profile.json"), "--repair-variant"])
     with pytest.raises(SystemExit) as e:
         translate_api.main()
-    assert "variant is known" in str(e.value.code)
+    assert "for Chinese targets" in str(e.value.code)

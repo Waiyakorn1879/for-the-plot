@@ -44,6 +44,10 @@ python scripts/init_project.py --game "<game install>" --language <id>
 
 It scaffolds the project beside the game — profile, style-guide skeleton, QA rules, a `.gitignore` that keeps game text out of version control, and **`TRANSLATION.md`**, the project's own always-loaded instruction file, with `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` stubs pointing at it. That file is the point: a translation runs for hundreds of batches across many sessions, and a convention discovered at string 1,400 gets re-broken by string 1,450 unless it lives somewhere loaded every time.
 
+## §2a Chinese: choose the script first [ADAPT]
+
+If the target is Chinese, ask the user whether it is **Simplified** (Mainland China, Singapore) or **Traditional** (Taiwan, Hong Kong) before scaffolding. Never assume. Scaffold with `--language schinese` or `tchinese`: the choice goes into `profile.json` and is locked for the project, because `init_project.py` refuses a generic `chinese` id and `translate_api.py` and `qa_check.py` stop on an unknown or contradictory script. Changing it later means re-translating. See `references/chinese.md`.
+
 ## §2b Character records and relationships [PORTABLE] structure, [RE-DERIVE] cast
 
 `profile.json` → `speakers` is the character dictionary. A record can carry `register`, default and **per-relationship** pronouns (`to`), `forbidden`, `must_use`, an inner-monologue override, and approved `examples`. It feeds the translation prompt as a persona card *and* `qa_check.py` as register rules, from one source — so the voice asked for is the voice checked.

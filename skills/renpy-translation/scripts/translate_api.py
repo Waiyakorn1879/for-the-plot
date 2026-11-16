@@ -711,9 +711,8 @@ def _print_summary(context_hits, default_hits, llm_translations,
 def run_repair(args, profile, base, system, policy, call_model, progress_file):
     """--repair-variant: the dictionary and the speaker overrides. -> exit status."""
     cfg = orthography.config(profile)
-    if not cfg or not cfg["variant"]:
-        return ("--repair-variant needs a Chinese target whose variant is known: set "
-                '"orthography": {"variant": "simplified"|"traditional"} in the profile')
+    if not cfg:
+        return "--repair-variant is for Chinese targets"
     sp_file = base / profile.get("speaker_translations_file", "speaker_translations.json")
     stores = [(progress_file, json.loads(progress_file.read_text(encoding="utf-8"))
                if progress_file.is_file() else {}, lambda k: k)]
@@ -770,6 +769,12 @@ def main():
     speakers.setdefault("_text", {"name": "(on-screen text)", "role": "narrator-style text shown on screen"})
     speakers.setdefault("_menu", {"name": "(menu choice)", "role": "a choice the player picks"})
     speakers.setdefault("narrator", {"name": "(narration)", "role": "third-person narration"})
+
+    # A Chinese project translates into ONE script, chosen by the user up front.
+    # Writing text before that is settled is how a project ends up with both.
+    blocked = orthography.problem(profile)
+    if blocked:
+        sys.exit(blocked)
 
     lang_name = profile.get("language_name", profile.get("language_id", "the target language"))
     batch_size = profile.get("api", {}).get("batch_size", 20)

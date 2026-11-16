@@ -2,15 +2,19 @@
 
 Read this at the Profile phase when the target is Chinese. It covers what is different from any other language: the two scripts, punctuation, what the tools check, and fonts.
 
-## 1. Pick the variant first
+## 1. Ask the user which script, then lock it
 
-Simplified and Traditional are two scripts, and usually two vocabularies. Decide before batch 1; a project that mixes them is rewritten, not patched.
+Simplified and Traditional are two scripts, and usually two vocabularies. **Ask the user before scaffolding; never choose for them.** A project that mixes the two is rewritten, not patched, so the choice is made once and then enforced:
+
+- `init_project.py` refuses a generic `chinese` / `zh` language id (add `--variant simplified|traditional` if you need a custom id) and writes the choice to `profile.json`.
+- `translate_api.py` stops, before any text is written, if the script is unknown or the language id and `orthography.variant` disagree. So does `qa_check.py` on a disagreement.
+- Changing it later means re-translating: `--repair-variant` fixes stray characters, not a project written in the wrong script.
 
 | Language id | Variant | Typical audience |
 |---|---|---|
 | `schinese` (also `zh_cn`, `zh_hans`, `chinese_simplified`) | Simplified | Mainland China, Singapore |
 | `tchinese` (also `zh_tw`, `zh_hk`, `zh_hant`, `chinese_traditional`) | Traditional | Taiwan, Hong Kong |
-| `chinese`, `zh` | not known | set `"orthography": {"variant": "..."}` in the profile |
+| `chinese`, `zh` | not known: refused by the scaffold | scaffold with `--variant`, or set `"orthography": {"variant": "..."}` |
 
 `init_project.py --language schinese` writes the variant into the profile, a `language_name` of "Simplified Chinese", and `validation.target_script: "chinese"`. The language id is also the folder name under `game/tl/`, so keep it a plain identifier (`zh_cn`, not `zh-CN`).
 

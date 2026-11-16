@@ -200,6 +200,11 @@ def main():
     args = ap.parse_args()
 
     profile, base = load_profile(args.profile)
+    # An unknown script is only a note in the report (existing projects keep
+    # working); a language id that contradicts the declared script is an error.
+    conflict = orthography.problem(profile, need_variant=False)
+    if conflict:
+        sys.exit(conflict)
     strings_file = Path(args.strings) if args.strings else base / profile.get("strings_file", "strings.json")
     trans_file = Path(args.translations) if args.translations else base / profile.get("progress_file", "translations.json")
 
