@@ -519,8 +519,44 @@ def gate_overrides(speaker_translations, policy):
     return kept, dropped
 
 
+_STRAIGHT_APOS_RE = re.compile(r"(?<!\\)'")
+
+
+def _runtime_form(key):
+    """The string the generated literal decodes to: `\\"` and `"` are one key."""
+    return key.replace('\\"', '"')
+
+
+def alternate_spellings(keys):
+    """-> {alternate key: the key it stands in for}.
+
+    The runtime filter matches a line exactly, so a key typed with a straight
+    apostrophe misses a script line that uses a curly one (and the reverse) and
+    the player sees English. For each key, the same text with its apostrophes
+    the other way round is emitted as well, unless that spelling is already a
+    key of its own: an entry someone wrote always wins, and two real keys that
+    disagree are still `find_twins.py`'s job. Escaped-quote spellings need
+    nothing here: `\\"` and `"` already decode to one runtime key.
+    """
+    keys = list(keys)
+    taken = {_runtime_form(k) for k in keys}
+    out = {}
+    for key in keys:
+        for alt in (key.replace("’", "'"), _STRAIGHT_APOS_RE.sub("’", key)):
+            if _runtime_form(alt) not in taken:
+                taken.add(_runtime_form(alt))
+                out[alt] = key
+    return out
+
+
 def build_dict_rpy(translations, ident, lang_name, chunk=None, speaker_translations=None):
     """Yield (filename_suffix, content) for one or more dict files."""
+    alternates = alternate_spellings(translations)
+    by_speaker = {}
+    for spk, eng in (speaker_translations or {}):
+        by_speaker.setdefault(spk, []).append(eng)
+    speaker_alternates = {(spk, alt): (spk, eng) for spk, texts in by_speaker.items()
+                          for alt, eng in alternate_spellings(texts).items()}
     items = list(translations.items())
     if not chunk or chunk <= 0:
         chunk = len(items) or 1
@@ -543,6 +579,22 @@ def build_dict_rpy(translations, ident, lang_name, chunk=None, speaker_translati
             lines.append(f"\n    _{ident}_speaker_translations.update({{\n")
             for (spk, eng), tr in speaker_translations.items():
                 lines.append(f"        ({py2_unicode_repr(spk)}, {py2_unicode_repr(eng)}): {py2_unicode_repr(tr)},\n")
+            lines.append("    })\n")
+
+        # Same translations under the other apostrophe spelling (see
+        # alternate_spellings). A separate block, in the first file only, so
+        # the entries above stay byte-identical to what a project authored.
+        if fi == 0 and alternates:
+            lines.append(f"\n    # alternate apostrophe spellings of keys above\n"
+                         f"    _{ident}_translations.update({{\n")
+            for alt, eng in alternates.items():
+                lines.append(f"        {py2_unicode_repr(alt)}: {py2_unicode_repr(translations[eng])},\n")
+            lines.append("    })\n")
+        if fi == 0 and speaker_alternates:
+            lines.append(f"\n    _{ident}_speaker_translations.update({{\n")
+            for (spk, alt), real in speaker_alternates.items():
+                lines.append(f"        ({py2_unicode_repr(spk)}, {py2_unicode_repr(alt)}): "
+                             f"{py2_unicode_repr(speaker_translations[real])},\n")
             lines.append("    })\n")
 
         yield fi, "".join(lines)
