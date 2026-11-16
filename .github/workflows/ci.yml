@@ -15,12 +15,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.9", "3.13"]
+        python-version: ["3.13"]
         include:
-          # The docs promise 3.8+. Pinned to 22.04: newer runner images are
-          # not guaranteed to carry an end-of-life interpreter.
+          # The docs promise 3.8+. Both old interpreters are pinned to 22.04:
+          # ubuntu-latest moved to 26.04, which has no 3.9 build for
+          # setup-python (the job died in setup), and newer images are not
+          # guaranteed to carry any end-of-life interpreter.
           - os: ubuntu-22.04
             python-version: "3.8"
+          - os: ubuntu-22.04
+            python-version: "3.9"
           # Most of validation.py exists for Windows hazards (console
           # encoding, CRLF, atomic replace); run the suite where they bite.
           - os: windows-latest
