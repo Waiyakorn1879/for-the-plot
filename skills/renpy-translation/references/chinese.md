@@ -63,7 +63,14 @@ python orthography.py --profile profile.json --write   # fix halfwidth, ellipsis
 
 The fixer masks tokens, holds every result to the validity gate, and backs the stores up first. Run it after a bulk pass and before the review.
 
-**A variant leak is reported, never converted.** Simplified to Traditional is one-to-many (`发` is `發` or `髮`), so a mechanical swap produces wrong characters that look right. Fix the lines by hand with `edit_lines.py`, or run a real converter such as OpenCC over the store and review the result.
+**A variant leak is repaired by the model, never by a table.** Simplified to Traditional is one-to-many (`发` is `發` or `髮`), so a mechanical swap produces wrong characters that look right, and the standard library has no conversion data. Instead:
+
+```
+python translate_api.py --profile profile.json --repair-variant           # dry-run: shows each fix
+python translate_api.py --profile profile.json --repair-variant --write   # backs up, then saves
+```
+
+Only the flagged lines (dictionary and speaker overrides) are sent, with the characters that are wrong named. An answer is saved only if it clears the gate a fresh translation does (tokens, echo, script, terms) **and** no longer leaks **and** is about the same length as the line it replaces, so a rewrite is refused. A refused line is retried once, then left exactly as it was and listed; the exit status is 1 while any remain. Review the dry-run before `--write`: it is a conversion, not a re-translation, but it is still model output. In-session, do the same by hand: take the `zh variant` lines from the QA report and fix them with `edit_lines.py`. A project with a different converter (OpenCC) can use it instead; nothing here depends on it.
 
 How the variant check works, and its limits: it uses Python's own GB2312 and Big5 tables. A character GB2312 has and Big5 lacks is Simplified-only; a common Big5 character GB2312 lacks is Traditional-only. It is conservative on purpose. A Simplified form that is also a real Traditional character (后 里 只 干 面) is never flagged, so a clean report does not prove the text is free of the other script. A rare character legitimate in both can be flagged: list it in `"orthography": {"allow_chars": "瞭"}`.
 

@@ -173,3 +173,105 @@ def test_scaffold_declares_the_variant(tmp_path):
                           capture_output=True, text=True, encoding="utf-8")
     profile = json.loads((tmp_path / "zh" / "profile.json").read_text(encoding="utf-8"))
     assert "orthography" not in profile and "Simplified or Traditional is not known" in proc.stdout
+
+
+# ---- translate_api.py --repair-variant ----------------------------------------
+
+import pytest
+import translate_api
+
+
+def repair(tmp_path, monkeypatch, tr, answer, sp=None, argv=(), variant="simplified"):
+    """Run --repair-variant against a stub model. -> (exit status, model calls)."""
+    project(tmp_path, tr, sp=sp, language="schinese" if variant == "simplified" else "tchinese",
+            extra={"api": {"provider": "stub", "batch_size": 10}})
+    calls = []
+
+    def factory(profile):
+        def call_model(system, user):
+            calls.append(user)
+            return json.dumps(answer(user) if callable(answer) else answer, ensure_ascii=False)
+        return call_model
+
+    monkeypatch.setitem(translate_api.PROVIDERS, "stub", factory)
+    monkeypatch.setattr(translate_api.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(translate_api.sys, "argv", ["translate_api.py", "--profile",
+                        str(tmp_path / "profile.json"), "--repair-variant", *argv])
+    with pytest.raises(SystemExit) as e:
+        translate_api.main()
+    return e.value.code, calls
+
+
+RAIN = {"The rain kept falling.": "雨還在下個不停。", "Fine.": "好的。"}
+read = lambda tmp_path, n="translations.json": json.loads(
+    (tmp_path / n).read_text(encoding="utf-8"))
+
+
+def test_repair_dry_run_shows_the_fix_and_writes_nothing(tmp_path, monkeypatch, capsys):
+    code, calls = repair(tmp_path, monkeypatch, RAIN, [{"id": 0, "tr": "雨还在下个不停。"}])
+    out = capsys.readouterr().out
+    assert code == 0 and len(calls) == 1
+    assert "雨還在下個不停。 -> 雨还在下个不停。" in out and "dry-run" in out
+    assert "Fine." not in calls[0], "only the leaking line goes to the model"
+    assert '"wrong": "還個"' in calls[0]
+    assert read(tmp_path) == RAIN and not list(tmp_path.glob("*.bak-*"))
+
+
+def test_repair_write_fixes_both_stores_with_backups(tmp_path, monkeypatch):
+    sp = {"a::We said so.": "我們说过。"}
+    code, _ = repair(tmp_path, monkeypatch, RAIN, lambda u: [
+        {"id": 0, "tr": "雨还在下个不停。"}, {"id": 1, "tr": "我们说过。"}], sp=sp, argv=["--write"])
+    assert code == 0
+    assert read(tmp_path) == {**RAIN, "The rain kept falling.": "雨还在下个不停。"}
+    assert read(tmp_path, "speaker_translations.json") == {"a::We said so.": "我们说过。"}
+    assert list(tmp_path.glob("translations.json.bak-*"))
+    assert list(tmp_path.glob("speaker_translations.json.bak-*"))
+    # now clean: a second run is a no-op that never calls the model
+    code, calls = repair(tmp_path, monkeypatch, read(tmp_path), [], argv=["--write"])
+    assert code == 0 and calls == []
+
+
+def test_repair_other_direction(tmp_path, monkeypatch):
+    code, _ = repair(tmp_path, monkeypatch, {"We said so.": "我們说过。"},
+                     [{"id": 0, "tr": "我們說過。"}], argv=["--write"], variant="traditional")
+    assert code == 0 and read(tmp_path) == {"We said so.": "我們說過。"}
+
+
+BAD_ANSWERS = {
+    "LEAK": "雨還在下个不停。",                 # still carries a Traditional character
+    "REWRITTEN": "雨一直下，没有停下来的意思。",   # a new sentence, not a conversion
+    "TOKEN": "雨还在下个不停。{b}",              # grew a tag
+    "ECHO": "The rain kept falling.",
+}
+
+
+@pytest.mark.parametrize("reason", sorted(BAD_ANSWERS))
+def test_a_bad_answer_is_refused_and_the_line_stays_as_it_was(tmp_path, monkeypatch, capsys, reason):
+    code, calls = repair(tmp_path, monkeypatch, RAIN, [{"id": 0, "tr": BAD_ANSWERS[reason]}],
+                         argv=["--write"])
+    out = capsys.readouterr().out
+    assert code == 1 and f"left alone [{reason}]" in out and len(calls) == 2, "one retry"
+    assert read(tmp_path) == RAIN and not list(tmp_path.glob("*.bak-*"))
+
+
+def test_a_missing_answer_and_an_api_error_are_survivable(tmp_path, monkeypatch, capsys):
+    code, _ = repair(tmp_path, monkeypatch, RAIN, [], argv=["--write"])
+    assert code == 1 and "left alone [MISSING]" in capsys.readouterr().out
+    assert read(tmp_path) == RAIN
+
+
+def test_second_attempt_can_succeed(tmp_path, monkeypatch):
+    answers = iter([[{"id": 0, "tr": "雨還在下个不停。"}], [{"id": 0, "tr": "雨还在下个不停。"}]])
+    code, calls = repair(tmp_path, monkeypatch, RAIN, lambda u: next(answers), argv=["--write"])
+    assert code == 0 and len(calls) == 2
+    assert read(tmp_path)["The rain kept falling."] == "雨还在下个不停。"
+
+
+def test_repair_needs_a_known_variant(tmp_path, monkeypatch):
+    project(tmp_path, RAIN, language="chinese", extra={"api": {"provider": "stub"}})
+    monkeypatch.setitem(translate_api.PROVIDERS, "stub", lambda p: (lambda s, u: "[]"))
+    monkeypatch.setattr(translate_api.sys, "argv", ["translate_api.py", "--profile",
+                        str(tmp_path / "profile.json"), "--repair-variant"])
+    with pytest.raises(SystemExit) as e:
+        translate_api.main()
+    assert "variant is known" in str(e.value.code)

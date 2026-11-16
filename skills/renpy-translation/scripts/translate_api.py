@@ -621,6 +621,63 @@ def translate_batch(call_model, system, speakers, lang_name, batch,
     return result
 
 
+REPAIR_PROMPT = (
+    "Each line below is already translated, but it contains characters that belong to the "
+    "other Chinese script (listed as \"wrong\"). Rewrite ONLY the \"current\" text in {variant} "
+    "Chinese: change the wrong characters to their {variant} forms and touch nothing else - same "
+    "words, same punctuation, same [variables], {{tags}} and escapes, same length. Output JSON "
+    "array only: [{{\"id\": N, \"tr\": \"...\"}}, ...]")
+
+
+def repair_variant(call_model, system, cfg, entries, policy, batch_size=20, attempts=2):
+    """Rewrite translations that carry characters of the other Chinese script.
+    entries: {key: (source, translation)} -> ({key: new translation}, {key: reason}).
+
+    A script swap is one-to-many (发 is 發 or 髮), so no table can do it; the
+    model can, from context. Its answer is accepted only if it clears every
+    gate the original did (tokens, validity, no leak left) AND stays a
+    conversion, not a rewrite: roughly the same length as what it replaced.
+    Anything else is left exactly as it was and reported.
+    """
+    todo = {k: (src, tr) for k, (src, tr) in entries.items()
+            if orthography.wrong_variant(tr, cfg)}
+    fixed, why = {}, {}
+    for attempt in range(attempts):
+        keys = [k for k in todo if k not in fixed]
+        for i in range(0, len(keys), batch_size):
+            chunk = keys[i:i + batch_size]
+            lines = [json.dumps({"id": n, "current": todo[k][1],
+                                 "wrong": orthography.wrong_variant(todo[k][1], cfg),
+                                 "english": todo[k][0]}, ensure_ascii=False)
+                     for n, k in enumerate(chunk)]
+            user = REPAIR_PROMPT.format(variant=cfg["variant"].capitalize()) \
+                + "\n\n[\n" + ",\n".join(lines) + "\n]"
+            try:
+                reply = extract_json_array(call_model(system, user))
+            except Exception as e:
+                print(f"  API error: {e}. Leaving this batch for the next run.")
+                continue
+            got = {r["id"]: r["tr"] for r in reply
+                   if isinstance(r, dict) and "id" in r and isinstance(r.get("tr"), str)}
+            for n, k in enumerate(chunk):
+                src, old = todo[k]
+                new = got.get(n)
+                if new is None:
+                    why[k] = "MISSING"
+                elif token_signature(src) != token_signature(new):
+                    why[k] = "TOKEN"
+                elif not validate_translation(src, new, policy)[0]:
+                    why[k] = validate_translation(src, new, policy)[1]
+                elif orthography.wrong_variant(new, cfg):
+                    why[k] = "LEAK"
+                elif abs(len(new) - len(old)) > max(2, len(old) // 5):
+                    why[k] = "REWRITTEN"
+                else:
+                    fixed[k] = new
+                    why.pop(k, None)
+    return fixed, {k: v for k, v in why.items() if k not in fixed}
+
+
 # Rejections only a batch can produce (validation.REASONS covers the rest).
 BATCH_REASONS = {
     "MISSING": "was left out of the model's reply",
@@ -651,11 +708,55 @@ def _print_summary(context_hits, default_hits, llm_translations,
         print("  These stay untranslated and will be retried on the next run.")
 
 
+def run_repair(args, profile, base, system, policy, call_model, progress_file):
+    """--repair-variant: the dictionary and the speaker overrides. -> exit status."""
+    cfg = orthography.config(profile)
+    if not cfg or not cfg["variant"]:
+        return ("--repair-variant needs a Chinese target whose variant is known: set "
+                '"orthography": {"variant": "simplified"|"traditional"} in the profile')
+    sp_file = base / profile.get("speaker_translations_file", "speaker_translations.json")
+    stores = [(progress_file, json.loads(progress_file.read_text(encoding="utf-8"))
+               if progress_file.is_file() else {}, lambda k: k)]
+    if sp_file.is_file():
+        stores.append((sp_file, json.loads(sp_file.read_text(encoding="utf-8")),
+                       lambda k: k.split("::", 1)[-1]))
+    entries = {(i, k): (src(k), v) for i, (_, d, src) in enumerate(stores) for k, v in d.items()}
+    leaks = sum(1 for _, v in entries.values() if orthography.wrong_variant(v, cfg))
+    print(f"{leaks} entr(ies) contain {'Traditional' if cfg['variant'] == 'simplified' else 'Simplified'} "
+          f"characters in a {cfg['variant']} translation.")
+    if not leaks:
+        return 0
+    fixed, why = repair_variant(call_model, system, cfg, entries, policy,
+                                profile.get("api", {}).get("batch_size", 20))
+    for (i, k), new in fixed.items():
+        print(f"  {entries[(i, k)][1][:50]} -> {new[:50]}")
+    for (i, k), reason in why.items():
+        print(f"  left alone [{reason}] {entries[(i, k)][1][:60]}")
+    print(f"{len(fixed)} repaired, {len(why)} left alone")
+    if not args.write:
+        print("dry-run: nothing written (use --write)")
+        return 1 if why else 0
+    for i, (path, d, _) in enumerate(stores):
+        if any(si == i for si, _ in fixed):
+            bak = backup_file(path)
+            for (si, k), new in fixed.items():
+                if si == i:
+                    d[k] = new
+            write_text_atomic(path, json.dumps(d, ensure_ascii=False, indent=2))
+            print(f"wrote {path.name} (backup {bak.name})")
+    return 1 if why else 0
+
+
 def main():
     ap = argparse.ArgumentParser(description="Bulk API translation pass for Ren'Py strings")
     ap.add_argument("--profile", required=True, help="profile.json")
     ap.add_argument("--strings", help="strings file (overrides profile strings_file)")
     ap.add_argument("--progress", help="progress file (overrides profile progress_file)")
+    ap.add_argument("--repair-variant", action="store_true",
+                    help="Chinese only: rewrite translations that contain characters of the "
+                         "other script (dry-run unless --write); translates nothing else")
+    ap.add_argument("--write", action="store_true",
+                    help="with --repair-variant: save the repairs (default: show them)")
     ap.add_argument("--no-backup", action="store_true",
                     help="do not copy the progress file aside before this run changes it")
     args = ap.parse_args()
@@ -695,6 +796,9 @@ def main():
         progress = json.loads(progress_file.read_text(encoding="utf-8"))
     else:
         progress = {}  # english -> translation
+
+    if args.repair_variant:
+        sys.exit(run_repair(args, profile, base, system, policy, call_model, progress_file))
 
     backed_up = [args.no_backup or not progress]
 
