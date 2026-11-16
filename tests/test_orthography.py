@@ -166,7 +166,8 @@ def test_scaffold_declares_the_variant(tmp_path):
         assert profile["orthography"] == {"variant": variant}
         assert profile["language_name"] == name
         assert profile["validation"]["target_script"] == "chinese"
-        assert "references/chinese.md" in proc.stdout
+        assert "references/locales/chinese.md" in proc.stdout
+        assert f"references/locales/chinese-{variant}.md" in proc.stdout
     assert "script locked to traditional" in proc.stdout
 
 

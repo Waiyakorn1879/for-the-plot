@@ -250,10 +250,11 @@ def main():
                               if conventions else DEFAULT_TRUNCATION_RATIO)
 
     def convention_issues(tr):
-        """-> [(category, label)]. A variant leak is a hard failure only when
-        the profile itself names the variant; everything else is for review."""
-        return [(2 if label.startswith("variant") and conventions["explicit"] else 4,
-                 "zh " + label) for label in orthography.issues(tr, conventions)]
+        """-> [(category, label)]. How hard a finding is, is the language's call
+        (Chinese: a script leak only when the profile itself names the variant)."""
+        return [(orthography.severity(label, conventions),
+                 f"{orthography.prefix(conventions)} {label}")
+                for label in orthography.issues(tr, conventions)]
     trunc_min_len = qa_conf.get("truncation_min_len", DEFAULT_TRUNCATION_MIN_LEN)
 
     for rule in rules:
@@ -419,10 +420,7 @@ def main():
     if overrides:
         emit(f"  Speaker overrides: {len(overrides)} checked")
     if conventions and not args.technical_only:
-        variant = conventions["variant"] or "not set - set orthography.variant to check it"
-        emit(f"  Chinese conventions: variant={variant}"
-             + (" (a leak is a hard issue)" if conventions["explicit"] else "")
-             + "; orthography.py --write fixes the mechanical ones")
+        emit(f"  {orthography.banner(conventions)}")
     if bang_policy and not args.technical_only:
         emit(f"  Exclamation policy: {bang_over} line(s) carry a '!' the policy would drop "
              "(run punctuation.py; informational, not a failure)")

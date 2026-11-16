@@ -22,7 +22,7 @@ The pipeline was proven on a full Thai translation of *Being a DIK* — Episode 
   - `validation.py` — the shared gate that refuses to save or cache a "translation" that's just the English back again, or that contains none of the target script
   - `translation_memory.py` — a **Contextual Translation Memory** (TM): a durable source→translation cache that makes repeats and game-update re-runs free. As of v1.3 it stores **speaker-aware variants**, so when the same English line ("You.") needs a different rendering per character, the right one is retrieved deterministically from cache instead of re-translated — zero extra API cost (`stats` / `export` / `import` / `clean`)
   - `relationships.py` — **addressee resolution**: which character each line is spoken *to*, answered only from evidence it can name — a scope you declared, a name addressed in vocative position in the English, or a scene label containing exactly two speakers — and reported as *unresolved, with the reason* for everything else. There is deliberately no "who spoke nearby" guess: a wrong addressee yields a wrong pronoun on a line that looks perfectly fine, which is wrong silently and everywhere. Its report is also the project's audit — resolution rate per tier, **which resolved pairs still have no declared register**, tier disagreements, and speaker codes with no character record
-  - `orthography.py` — writing conventions for **Chinese** targets (Simplified vs Traditional, full-width punctuation, ellipsis, spacing), stated in the translation prompt, checked by QA, and fixed mechanically where that is safe
+  - `orthography.py` — writing conventions per target language (built in for **Chinese**: Simplified vs Traditional, full-width punctuation, ellipsis, spacing), stated in the translation prompt, checked by QA, and fixed mechanically where that is safe. Language-specific guidance lives in [`references/locales/`](skills/renpy-translation/references/locales/README.md): Thai, Chinese (Simplified and Traditional)
   - `qa_check.py` — technical checks (tags/variables/escapes/`%%`/missing/untranslated) plus declarative, language-specific register rules, including relationship rules that fire only on a resolved pairing
   - `build_patch.py` — generates a runtime-filter translation patch plus native `translate strings` blocks for GUI text (no game source modification)
 - **Character records** — `profile.json` → `speakers` is a real character dictionary: register, forbidden/required vocabulary, approved examples, an inner-monologue override, and **per-relationship pronouns** (in register-rich languages the pronoun belongs to the *pair*, not the person — the same protagonist uses one form with a close friend and another with a professor). Each record becomes a persona card in the translation prompt **and** a QA register rule, from one source — so the voice you asked for is the voice that gets checked. Every field is optional.
@@ -36,7 +36,9 @@ The default patch mechanism is a **runtime text filter**: a `config.say_menu_tex
 
 Because the dictionary is keyed on the game's own English text, the patch typically survives game updates, needs no Ren'Py SDK, and uninstalls by deleting one folder.
 
-## Worked example
+## Worked examples
+
+`skills/renpy-translation/examples/mini-schinese/` is a small synthetic Chinese project (profile, style guide, QA rules) built on a test fixture, with no real game text.
 
 `skills/renpy-translation/examples/badik-thai/` is a trimmed copy of the real profile behind a Thai translation of *Being a DIK* — started on EP1 (2,638 strings, 99.9%) and since carried through Episodes 1–8 (~36,000 strings, 99%+), Season 3 ongoing: a 35-character speech-register profile, a Thai pronoun matrix by relationship, declarative QA rules that catch register violations mechanically, and a lessons-learned writeup. Copy its structure — not its content — when starting your own game.
 

@@ -711,7 +711,7 @@ def _print_summary(context_hits, default_hits, llm_translations,
 def run_repair(args, profile, base, system, policy, call_model, progress_file):
     """--repair-variant: the dictionary and the speaker overrides. -> exit status."""
     cfg = orthography.config(profile)
-    if not cfg:
+    if not cfg or not hasattr(cfg["_module"], "wrong_variant"):
         return "--repair-variant is for Chinese targets"
     sp_file = base / profile.get("speaker_translations_file", "speaker_translations.json")
     stores = [(progress_file, json.loads(progress_file.read_text(encoding="utf-8"))

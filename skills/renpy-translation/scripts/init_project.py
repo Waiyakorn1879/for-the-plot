@@ -21,6 +21,7 @@ import json
 import sys
 from pathlib import Path
 
+import langs
 import orthography
 
 from validation import (
@@ -389,10 +390,13 @@ Next:
      translation-guide.md, by interviewing whoever knows the game
      (references/game-profile.md)
   4. Translate (references/translating.md){script_hint}""")
+    docs = langs.locale_docs(language_id)
+    if docs:
+        print("\n  This language has guidance: read before step 3 -> "
+              + ", ".join(f"references/locales/{d}" for d in docs))
     if conventions:
-        print(f"\n  Chinese target, script locked to {variant}: read references/chinese.md "
-              "before step 3 (punctuation, fonts). Changing the script later means "
-              "re-translating the project.")
+        print(f"  Chinese target, script locked to {variant}. Changing the script later "
+              "means re-translating the project.")
 
 
 if __name__ == "__main__":

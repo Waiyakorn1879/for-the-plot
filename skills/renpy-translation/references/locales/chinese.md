@@ -1,6 +1,8 @@
 # Chinese targets
 
-Read this at the Profile phase when the target is Chinese. It covers what is different from any other language: the two scripts, punctuation, what the tools check, and fonts.
+Read this at the Profile phase when the target is Chinese. It covers what both scripts share: the choice of script, punctuation, what the tools check, and fonts. What differs per script is in [chinese-simplified.md](chinese-simplified.md) and [chinese-traditional.md](chinese-traditional.md); read the one you chose.
+
+The code is `scripts/langs/zh.py`, reached through `scripts/orthography.py`.
 
 ## 1. Ask the user which script, then lock it
 
@@ -18,7 +20,19 @@ Simplified and Traditional are two scripts, and usually two vocabularies. **Ask 
 
 `init_project.py --language schinese` writes the variant into the profile, a `language_name` of "Simplified Chinese", and `validation.target_script: "chinese"`. The language id is also the folder name under `game/tl/`, so keep it a plain identifier (`zh_cn`, not `zh-CN`).
 
-Traditional is not Simplified with the characters swapped. Taiwan and the Mainland use different words for everyday things (software, video, taxi), so a Traditional translation is written for its region. Say which region in the style guide.
+Traditional is not Simplified with the characters swapped. Taiwan and the Mainland use different words for everyday things, so a Traditional translation is written for its region. Say which region in the style guide.
+
+| Concept | Mainland (Simplified) | Taiwan (Traditional) |
+|---|---|---|
+| software | 软件 | 軟體 |
+| video | 视频 | 影片 |
+| taxi | 出租车 | 計程車 |
+| network | 网络 | 網路 |
+| information | 信息 | 資訊 |
+| program | 程序 | 程式 |
+| default | 默认 | 預設 |
+| mouse | 鼠标 | 滑鼠 |
+| quality | 质量 | 品質 |
 
 ## 2. Conventions the prompt states and QA checks
 
@@ -33,7 +47,7 @@ One list, used in three places: the bulk translator's system prompt, `qa_check.p
 | Tokens stay ASCII | `[name]`, `{i}`, `\n`, `%%` | `［name］`, `【name】`, `｛i｝`, `％％` |
 | Digits and Latin letters stay half-width | `3.5`, `OK` | `３．５` |
 
-Quotation marks: an escaped `\"` in the source is a token and must stay `\"` (hard rule 1). For marks the translator adds, Simplified uses `“ ”` with `‘ ’` inside; Traditional uses `「 」` with `『 』` inside.
+Quotation marks: an escaped `\"` in the source is a token and must stay `\"` (hard rule 1). For marks the translator adds, each script has its own (see the variant file): Simplified `“ ”`, Traditional `「 」`.
 
 Inner thoughts: a source line wrapped in `( )` keeps its brackets. Either `(…)` or full-width `（…）` is recognised as a thought by QA and by `pair_audit.py`; pick one in the style guide.
 
@@ -44,7 +58,7 @@ Names: decide per name whether it stays in Latin letters (`keep_untranslated`) o
 Chinese has no gendered particles, so no gender rule is built in. Voice is carried by:
 
 - **你 / 您.** `您` only where a relationship calls for respect. Put it in `forbidden` for characters who would never use it, or in a relationship's `to[other].forbidden`.
-- **Self-reference and address terms** (老子, 本小姐, 人家, 哥, 学长 / 學長 …). These are the Chinese equivalent of a pronoun matrix: declare them per character and per pair in `speakers`, exactly as `game-profile.md` describes.
+- **Self-reference and address terms** (老子, 本小姐, 人家, 哥, 学长 / 學長 …). These are the Chinese equivalent of a pronoun matrix: declare them per character and per pair in `speakers`, exactly as [game-profile.md](../game-profile.md) describes.
 - **Sentence-final particles** (啊 吧 呢 嘛 啦 呀). Give each major character two or three approved `examples`; that steers a model better than describing the voice.
 
 ## 4. What the tools do
@@ -84,11 +98,11 @@ To turn all of this off: `"orthography": false`.
 
 ## 5. Fonts and line breaking
 
-- **The game's own font almost certainly has no Chinese glyphs.** Without a `font` block in the profile, every line renders as empty boxes. Set `font.regular` and list the game's font files in `font.replace_fonts` (see `patching.md`).
-- **Use a font built for your variant.** Source Han Sans / Noto Sans CJK ship as separate SC and TC builds under the SIL Open Font License. A Simplified-only font shows boxes for Traditional characters, and the two builds draw some shared characters differently.
+- **The game's own font almost certainly has no Chinese glyphs.** Without a `font` block in the profile, every line renders as empty boxes. Set `font.regular` and list the game's font files in `font.replace_fonts` (see [patching.md](../patching.md)).
+- **Use a font built for your variant.** Source Han Sans / Noto Sans CJK ship as separate builds per region under the SIL Open Font License (named in the variant file). A Simplified-only font shows boxes for Traditional characters, and the builds draw some shared characters differently.
 - **File size.** A full CJK font is 8 to 20 MB. That is normal; do not subset it unless you regenerate the subset on every update.
 - **Line breaking.** Chinese has no spaces, so the engine must be willing to break between characters. Ren'Py's default `language` style (`"unicode"`) follows the Unicode line-breaking algorithm, which does. Still check in the engine: a long line in the dialog box, a menu choice, and a line with `{w}` or `{i}` tags.
-- **Length.** Chinese is shorter than English, so fixed-width UI slots rarely overflow, but a larger `font.size_scale` is often wanted for legibility. Decide it on real dialog (`verify-in-engine.md`).
+- **Length.** Chinese is shorter than English, so fixed-width UI slots rarely overflow, but a larger `font.size_scale` is often wanted for legibility. Decide it on real dialog ([verify-in-engine.md](../verify-in-engine.md)).
 
 The Ren'Py points above were written without access to the Ren'Py documentation site; treat them as a checklist to confirm in the engine, not as a specification.
 
