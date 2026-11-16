@@ -36,6 +36,11 @@ def main():
     profile, base = json.loads(pp.read_text(encoding="utf-8")), pp.parent
     path = Path(args.translations) if args.translations else base / profile.get("progress_file", "translations.json")
     twins = find_twins(json.loads(path.read_text(encoding="utf-8")))
+    # Speaker overrides are keyed `speaker::text` and looked up the same way at
+    # runtime, so the same text spelled two ways for one speaker is a twin too.
+    sp_path = base / profile.get("speaker_translations_file", "speaker_translations.json")
+    if sp_path.is_file():
+        twins += find_twins(json.loads(sp_path.read_text(encoding="utf-8")))
     for _, g in twins:
         for k, v in g.items():
             print(f"  {k!r} -> {v!r}")

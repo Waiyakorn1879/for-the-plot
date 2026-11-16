@@ -13,7 +13,8 @@ Lines are found in strings.json by (file, line), so extract with --no-dedupe if
 a line is missing ("norow"). The edit lands on the speaker override
 (`speaker::text`) when one exists, else on the dictionary entry. Several jobs
 that hit the same entry are applied in order. Every result is held to the same
-gate as merge (tokens, tag nesting, echo, script, terms).
+gate as merge (tokens, tag nesting, echo, script, terms). Edits that pass are
+applied; the exit status is 1 if any edit was REJECTED.
 
 A dictionary entry serves EVERY line with that text. If other rows share it and
 are not in the jobs, they change too: reported as SHARED. Resolve it with a
@@ -142,9 +143,12 @@ def main():
     for old, new, where in changes.values():
         print(f"{where}  {old[:60]} -> {new[:60]}")
     print(f"{len(changes)} change(s), {len(problems)} problem(s)")
+    # Same contract as `speaker_overrides.py merge`: what passes is applied,
+    # and a refused edit still fails the run so a script cannot miss it.
+    status = 1 if any(p.startswith("REJECTED") for p in problems) else 0
     if not args.write:
         print("dry-run: nothing written (use --write)")
-        return
+        sys.exit(status)
     for path, d, tag in ((tr_path, tr, "tr"), (sp_path, sp, "sp")):
         if not any(s == tag for s, _ in changes) or not path.is_file():
             continue
@@ -154,6 +158,7 @@ def main():
                 d[k] = new
         write_text_atomic(path, json.dumps(d, ensure_ascii=False, indent=2))
         print(f"wrote {path.name} (backup {bak.name})")
+    sys.exit(status)
 
 
 if __name__ == "__main__":

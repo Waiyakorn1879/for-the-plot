@@ -618,6 +618,13 @@ def translate_batch(call_model, system, speakers, lang_name, batch,
     return result
 
 
+# Rejections only a batch can produce (validation.REASONS covers the rest).
+BATCH_REASONS = {
+    "MISSING": "was left out of the model's reply",
+    "TOKEN": "changed a [variable], {tag}, escape or %%",
+}
+
+
 def _print_summary(context_hits, default_hits, llm_translations,
                    rejected=None, tm_rejected=None, samples=()):
     tm_hits = context_hits + default_hits
@@ -635,7 +642,7 @@ def _print_summary(context_hits, default_hits, llm_translations,
     if rejected:
         print(f"Rejected (not saved, not cached): {sum(rejected.values())}")
         for code, n in sorted(rejected.items()):
-            print(f"  {code} — {REASONS.get(code, code)}: {n}")
+            print(f"  {code} — {REASONS.get(code) or BATCH_REASONS.get(code, code)}: {n}")
         for code, src in samples:
             print(f"    [{code}] {src[:70]}")
         print("  These stay untranslated and will be retried on the next run.")
@@ -795,11 +802,18 @@ def main():
         if mismatches:
             codes = sorted({c for _, c in mismatches})
             print(f"  Retrying {len(mismatches)} entries ({', '.join(codes)})...")
-            retry_result = translate_batch(call_model, system, speakers, lang_name,
-                                           [item for item, _ in mismatches],
-                                           retry=True, reasons=codes,
-                                           resolver=resolver, terms=policy["terms"],
-                                           previous=id_to_tr)
+            # A transport error here must not kill the run: the lines that
+            # already passed are still unsaved at this point. The failing ones
+            # stay untranslated and are picked up by the next run.
+            try:
+                retry_result = translate_batch(call_model, system, speakers, lang_name,
+                                               [item for item, _ in mismatches],
+                                               retry=True, reasons=codes,
+                                               resolver=resolver, terms=policy["terms"],
+                                               previous=id_to_tr)
+            except Exception as e:
+                print(f"  Retry failed: {e}. Keeping what passed.")
+                retry_result = []
             for r in retry_result:
                 if isinstance(r, dict) and "id" in r and "tr" in r:
                     id_to_tr[r["id"]] = r["tr"]
@@ -810,9 +824,12 @@ def main():
         accepted = 0
         for item in batch:
             tr = id_to_tr.get(item["id"])
-            if not tr or token_signature(item["text"]) != token_signature(tr):
-                continue
-            ok, code = validate_translation(item["text"], tr, policy)
+            if tr is None:
+                ok, code = False, "MISSING"
+            elif token_signature(item["text"]) != token_signature(tr):
+                ok, code = False, "TOKEN"
+            else:
+                ok, code = validate_translation(item["text"], tr, policy)
             if not ok:
                 rejected[code] = rejected.get(code, 0) + 1
                 if len(rejected_samples) < 5:

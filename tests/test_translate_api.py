@@ -379,6 +379,42 @@ class TestValidateBeforePersist:
         assert len(calls) == 2, "it should have been retried once"
         assert "source unchanged" in calls[1]
 
+    def test_retry_transport_error_keeps_what_already_passed(self, tmp_path, monkeypatch, capsys):
+        """The retry call sits after the first reply and before the save: an
+        error there used to abort the run and lose the batch's good lines."""
+        import json as _json
+        strings = self.STRINGS + [{"text": "Bye [n].", "speaker": "hero",
+                                   "file": "a.rpy", "line": 2, "kind": "say"}]
+        (tmp_path / "strings.json").write_text(_json.dumps(strings), encoding="utf-8")
+        (tmp_path / "profile.json").write_text(_json.dumps(self.PROFILE), encoding="utf-8")
+        calls = []
+
+        def stub_factory(profile):
+            def call_model(system, user):
+                calls.append(user)
+                if len(calls) > 1:
+                    raise RuntimeError("HTTP 503")
+                return _json.dumps([{"id": 0, "tr": "สวัสดี"}, {"id": 1, "tr": "ลาก่อน"}])
+            return call_model
+
+        monkeypatch.setitem(translate_api.PROVIDERS, "stub", stub_factory)
+        monkeypatch.setattr(translate_api.time, "sleep", lambda *_: None)
+        monkeypatch.setattr(translate_api.sys, "argv",
+                            ["translate_api.py", "--profile", str(tmp_path / "profile.json")])
+        translate_api.main()
+        progress = _json.loads((tmp_path / "tr.json").read_text(encoding="utf-8"))
+        assert progress == {"Hello there.": "สวัสดี"}
+        out = capsys.readouterr().out
+        assert "Retry failed: HTTP 503" in out
+        # the line that lost its [n] is counted, not silently dropped
+        assert "Rejected (not saved, not cached): 1" in out and "TOKEN" in out
+
+    def test_line_left_out_of_the_reply_is_counted(self, tmp_path, monkeypatch, capsys):
+        progress, _, _ = self._run(tmp_path, monkeypatch, [])
+        assert progress == {}
+        out = capsys.readouterr().out
+        assert "Rejected (not saved, not cached): 1" in out and "MISSING" in out
+
     def test_wrong_script_reply_reaches_neither_store(self, tmp_path, monkeypatch):
         progress, entries, _ = self._run(
             tmp_path, monkeypatch, [{"id": 0, "tr": "Bonjour."}])

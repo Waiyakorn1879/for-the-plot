@@ -93,3 +93,22 @@ def test_pair_audit_rejects_malformed_rules():
                 {"name": "x", "between": ["a", "b"], "forbid": "x", "min_run": 1}):
         with pytest.raises(SystemExit):
             pair_audit.check_rules([bad])
+
+
+def test_softening_never_saves_an_empty_translation(tmp_path):
+    (tmp_path / "profile.json").write_text(json.dumps({
+        "language_id": "thai", "progress_file": "t.json",
+        "punctuation": {"exclamation": {}}}), encoding="utf-8")
+    src = "I really can not believe it!"
+    data = {src: "!", "It is a long day!": "วันยาวนาน!"}
+    (tmp_path / "t.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "speaker_translations.json").write_text(
+        json.dumps({"a::" + src: "!!"}), encoding="utf-8")
+    out = subprocess.run([sys.executable, str(SCRIPTS_DIR / "punctuation.py"), "--profile",
+                          str(tmp_path / "profile.json"), "--write"], capture_output=True,
+                         text=True, encoding="utf-8").stdout
+    assert "1 entr(ies) to change" in out and "2 entr(ies) left alone" in out
+    assert json.loads((tmp_path / "t.json").read_text(encoding="utf-8")) == {
+        src: "!", "It is a long day!": "วันยาวนาน"}
+    # nothing changed in the overrides file, so it is neither rewritten nor backed up
+    assert not list(tmp_path.glob("speaker_translations.json.bak-*"))

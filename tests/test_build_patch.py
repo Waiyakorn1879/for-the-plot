@@ -303,3 +303,25 @@ def test_speaker_overrides_reach_the_dictionary_file():
         speaker_translations={("an", "Hi!"): "สวัสดีค่ะ", ("mc", "Hi!"): "สวัสดีครับ"})
     assert "_thai_speaker_translations.update" in content
     assert "(u'an', u'Hi!')" in content and "(u'mc', u'Hi!')" in content
+
+
+def test_bad_speaker_overrides_are_not_shipped(tmp_path):
+    import json, subprocess, sys
+    from conftest import SCRIPTS_DIR
+    (tmp_path / "profile.json").write_text(json.dumps({
+        "language_id": "thai", "language_name": "Thai", "progress_file": "t.json",
+        "validation": {"target_script": "thai"}}), encoding="utf-8")
+    (tmp_path / "t.json").write_text(json.dumps({"Thanks [n].": "ขอบคุณ [n]"}, ensure_ascii=False),
+                                     encoding="utf-8")
+    (tmp_path / "speaker_translations.json").write_text(json.dumps({
+        "a::Thanks [n].": "Thanks [n].",          # echo
+        "b::Thanks [n].": "ขอบคุณ {b}",            # token damage
+        "c::Thanks [n].": "ขอบคุณครับ [n]"}, ensure_ascii=False), encoding="utf-8")
+    proc = subprocess.run([sys.executable, str(SCRIPTS_DIR / "build_patch.py"), "--profile",
+                           str(tmp_path / "profile.json"), "--out", str(tmp_path / "out")],
+                          capture_output=True, text=True, encoding="utf-8")
+    assert proc.returncode == 0, proc.stderr
+    assert "2 override(s) NOT shipped" in proc.stdout
+    built = (tmp_path / "out" / "tl" / "thai" / "01_thai_dict.rpy").read_text(encoding="utf-8")
+    assert "(u'c', u'Thanks [n].'): u'ขอบคุณครับ [n]'" in built
+    assert "(u'a'," not in built and "(u'b'," not in built
