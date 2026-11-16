@@ -246,7 +246,7 @@ QC/
 """
 
 
-def build_profile(name, language_id, language_name, output_dir):
+def build_profile(name, language_id, language_name, output_dir, variant=None):
     profile = {
         "game_name": name,
         "language_id": language_id,
@@ -270,7 +270,8 @@ def build_profile(name, language_id, language_name, output_dir):
         profile["validation"]["target_script"] = script
     # A language id that names the Chinese variant makes it the project's
     # declared choice, so QA treats the other variant leaking in as a hard issue.
-    conventions = orthography.config({"language_id": language_id})
+    conventions = orthography.config({"language_id": language_id,
+                                      "orthography": {"variant": variant} if variant else {}})
     if conventions and conventions["variant"]:
         profile["orthography"] = {"variant": conventions["variant"]}
     return profile
@@ -283,6 +284,9 @@ def main():
                     help="path to the game install (read-only; used for the file map)")
     ap.add_argument("--language", required=True,
                     help="target language id, e.g. thai / french / japanese")
+    ap.add_argument("--variant", choices=("simplified", "traditional"),
+                    help="Chinese only: which script. Ask the user; not needed with "
+                         "schinese / tchinese, which already say it")
     ap.add_argument("--language-name", help="display name (default: capitalized id)")
     ap.add_argument("--name", help="game name (default: the game folder's name)")
     ap.add_argument("--dir", default=".", help="project folder to create (default: .)")
@@ -313,7 +317,15 @@ def main():
         pass
 
     language_id = args.language.lower()
-    conventions = orthography.config({"language_id": language_id})
+    # A Chinese project is Simplified or Traditional, chosen by the user BEFORE
+    # anything is created, and locked: refuse to guess, refuse a contradiction.
+    chosen = {"language_id": language_id}
+    if args.variant:
+        chosen["orthography"] = {"variant": args.variant}
+    blocked = orthography.problem(chosen)
+    if blocked:
+        sys.exit(blocked)
+    conventions = orthography.config(chosen)
     variant = conventions["variant"] if conventions else None
     language_name = args.language_name or (
         f"{variant.capitalize()} Chinese" if variant else language_id.capitalize())
@@ -340,7 +352,7 @@ def main():
         written.append(rel)
 
     write("profile.json", json.dumps(
-        build_profile(name, language_id, language_name, args.output_dir),
+        build_profile(name, language_id, language_name, args.output_dir, variant),
         ensure_ascii=False, indent=2) + "\n")
     write("TRANSLATION.md", TRANSLATION_MD.format(**fields))
     write("translation-guide.md", GUIDE_MD.format(**fields))
@@ -365,7 +377,7 @@ def main():
     if not (profile_path.parent / "profile.json").exists():
         return
     script_hint = ""
-    if "target_script" not in build_profile(name, language_id, language_name, "x")["validation"]:
+    if "target_script" not in build_profile(name, language_id, language_name, "x", variant)["validation"]:
         script_hint = ("\n  ! validation.target_script is unset — no enforceable script "
                        f"is known for '{language_id}'.\n"
                        "    Set it in profile.json if the target uses a non-Latin script.")
@@ -378,11 +390,9 @@ Next:
      (references/game-profile.md)
   4. Translate (references/translating.md){script_hint}""")
     if conventions:
-        print("\n  Chinese target: read references/chinese.md before step 3 "
-              "(variant, punctuation, fonts)." + ("" if variant else
-              "\n  ! Simplified or Traditional is not known from the language id "
-              f"'{language_id}'.\n    Set \"orthography\": {{\"variant\": ...}} in "
-              "profile.json, or use schinese / tchinese."))
+        print(f"\n  Chinese target, script locked to {variant}: read references/chinese.md "
+              "before step 3 (punctuation, fonts). Changing the script later means "
+              "re-translating the project.")
 
 
 if __name__ == "__main__":

@@ -61,6 +61,10 @@ A character who speaks under more than one code (`"???"` before introduction) ge
 
 When starting a new game, copy the example's structure, not its content.
 
+## Chinese target — ask which script first
+
+**If the target is Chinese, ask the user "Simplified (Mainland China, Singapore) or Traditional (Taiwan, Hong Kong)?" before scaffolding. Never assume or default.** Then scaffold with `--language schinese` or `tchinese`; the choice is written to the profile and **locked** for the project: `init_project.py` refuses a generic `chinese` id, and `translate_api.py` and `qa_check.py` stop on an unknown or contradictory script. Changing it later means re-translating. Details: `references/chinese.md`.
+
 ## Translation method — always ask first
 
 **Before starting the Translate phase, always ask the user which method to use. Never assume or silently default.** Present these three options (recommend in-session):

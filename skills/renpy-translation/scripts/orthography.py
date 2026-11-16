@@ -80,15 +80,50 @@ def config(profile):
     declared = str(block.get("variant", "")).lower()
     if lang not in CHINESE_IDS and declared not in ("simplified", "traditional"):
         return None
+    from_id = ("simplified" if lang in SIMPLIFIED_IDS
+               else "traditional" if lang in TRADITIONAL_IDS else None)
     if declared in ("simplified", "traditional"):
         variant, explicit = declared, True
     else:
-        variant = ("simplified" if lang in SIMPLIFIED_IDS
-                   else "traditional" if lang in TRADITIONAL_IDS else None)
-        explicit = False
+        variant, explicit = from_id, False
     return {"language": "chinese", "variant": variant, "explicit": explicit,
+            # the language id says one script and the profile another
+            "conflict": (from_id, declared) if from_id and declared in ("simplified", "traditional")
+                        and from_id != declared else None,
             "allow_chars": set(block.get("allow_chars", "")),
             "truncation_ratio": CHINESE_TRUNCATION_RATIO}
+
+
+CHOOSE = (
+    "This is a Chinese target but the project does not say WHICH script. Ask the user "
+    "before anything is translated:\n"
+    "  Simplified  (Mainland China, Singapore)  -> language id schinese\n"
+    "  Traditional (Taiwan, Hong Kong)          -> language id tchinese\n"
+    "Then record it - scaffold with `init_project.py --language schinese|tchinese` or set "
+    '"orthography": {"variant": "simplified"|"traditional"} in profile.json - and keep it: '
+    "changing it later means re-translating the project.")
+
+
+def problem(profile, need_variant=True):
+    """-> a message when a Chinese target has no single, consistent script, else
+    None (also None for every other language and for `"orthography": false`).
+
+    The choice is made once, by the user, before the first line is translated,
+    and then locked: an unknown script (`need_variant`) or a language id that
+    contradicts the declared one stops the tools that would write text.
+    """
+    cfg = config(profile)
+    if cfg is None:
+        return None
+    if cfg["conflict"]:
+        had, declared = cfg["conflict"]
+        return (f"language_id '{profile.get('language_id')}' is {had} Chinese but "
+                f'"orthography": {{"variant": "{declared}"}} says {declared}. A project '
+                "has one script. Ask the user which is meant, then make the two agree "
+                "(changing a project that already has translations means re-translating it).")
+    if need_variant and not cfg["variant"]:
+        return CHOOSE
+    return None
 
 
 # ---- Simplified / Traditional -------------------------------------------
@@ -278,6 +313,9 @@ def main():
 
     pp = Path(args.profile)
     profile, base = json.loads(pp.read_text(encoding="utf-8")), pp.parent
+    msg = problem(profile, need_variant=False)
+    if msg:
+        raise SystemExit(msg)
     cfg = config(profile)
     if cfg is None:
         raise SystemExit("no writing conventions are built in for this profile's language "
