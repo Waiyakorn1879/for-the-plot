@@ -38,12 +38,13 @@ from characters import (
     gender_grammar, avoid_pattern, get_record, is_character,
     is_monologue, missing_must_use, register_rules, resolve_alias,
 )
+import orthography
 import punctuation
 import terminology
 from relationships import build_resolver
 from validation import (
     ESC_RE, PCT_RE, TAG_RE, VAR_RE,
-    configure_console, multiset_diff, norm_key, policy_banner, validate_translation,
+    configure_console, mask_tokens, multiset_diff, norm_key, policy_banner, validate_translation,
     validation_policy, write_text_atomic,
 )
 
@@ -237,7 +238,17 @@ def main():
     rules = [r for r in generated if r["name"] not in authored_names] + authored
     window = qa_conf.get("window", DEFAULT_WINDOW)
     roman_check = qa_conf.get("roman_check", True)
-    trunc_ratio = qa_conf.get("truncation_ratio", DEFAULT_TRUNCATION_RATIO)
+    # Writing conventions of the target language (Chinese): the same list the
+    # translation prompt states.
+    conventions = orthography.config(profile)
+    trunc_ratio = qa_conf.get("truncation_ratio", conventions["truncation_ratio"]
+                              if conventions else DEFAULT_TRUNCATION_RATIO)
+
+    def convention_issues(tr):
+        """-> [(category, label)]. A variant leak is a hard failure only when
+        the profile itself names the variant; everything else is for review."""
+        return [(2 if label.startswith("variant") and conventions["explicit"] else 4,
+                 "zh " + label) for label in orthography.issues(tr, conventions)]
     trunc_min_len = qa_conf.get("truncation_min_len", DEFAULT_TRUNCATION_MIN_LEN)
 
     for rule in rules:
@@ -331,10 +342,15 @@ def main():
         # An echoed line is 100% Latin by definition; reporting it again as a
         # cat-4 phrasing flag is noise on top of a cat-1 failure.
         if roman_check and not untranslated:
-            roman_words = ROMAN_RE.findall(tr)
+            # Tokens are not prose: [partner_name] is not two untranslated words.
+            roman_words = ROMAN_RE.findall(mask_tokens(tr)[0])
             non_proper = [w for w in roman_words if w.lower() not in keep_lower]
             if non_proper:
                 categories[4].append((f"roman:{','.join(non_proper[:3])}", speaker, file, line, text, tr))
+
+        if conventions:
+            for cat, label in convention_issues(tr):
+                categories[cat].append((label, speaker, file, line, text, tr))
 
         if len(text) > trunc_min_len and tr and len(tr) < len(text) * trunc_ratio:
             categories[4].append(("short?", speaker, file, line, text, tr))
@@ -356,6 +372,9 @@ def main():
         labels = technical_issues(text, otr, policy)[0] if otr and otr.strip() else ["EMPTY"]
         for label in labels:
             categories[1].append((f"OVERRIDE {label}", code, file, line, text, otr or ""))
+        if conventions and not args.technical_only and otr:
+            for cat, label in convention_issues(otr):
+                categories[cat].append((f"OVERRIDE {label}", code, file, line, text, otr))
 
     # ── Report ──────────────────────────────────────────────────────────────
     out = io.StringIO()
@@ -394,6 +413,11 @@ def main():
                  f"character record — run relationships.py to list them.")
     if overrides:
         emit(f"  Speaker overrides: {len(overrides)} checked")
+    if conventions and not args.technical_only:
+        variant = conventions["variant"] or "not set - set orthography.variant to check it"
+        emit(f"  Chinese conventions: variant={variant}"
+             + (" (a leak is a hard issue)" if conventions["explicit"] else "")
+             + "; orthography.py --write fixes the mechanical ones")
     if bang_policy and not args.technical_only:
         emit(f"  Exclamation policy: {bang_over} line(s) carry a '!' the policy would drop "
              "(run punctuation.py; informational, not a failure)")

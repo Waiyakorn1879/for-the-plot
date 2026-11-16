@@ -79,6 +79,9 @@ jobs:
           assert terminology.STAGES == ("DISCOVERED", "CANDIDATE", "REVIEWED",
                                         "APPROVED", "ENFORCED")
           assert schema["properties"]["terminology_file"]
+          # v1.6.2: target-language writing conventions (Chinese).
+          orth = schema["properties"]["orthography"]["properties"]
+          assert set(orth["variant"]["enum"]) == {"simplified", "traditional"}
           print("manifests OK")
           EOF
 

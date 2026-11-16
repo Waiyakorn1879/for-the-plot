@@ -613,3 +613,12 @@ def test_missing_input_file_is_a_message_not_a_traceback(tmp_path):
     (tmp_path / "strings.json").write_text("[]", encoding="utf-8")
     proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
     assert "translations file not found" in proc.stderr and "Traceback" not in proc.stderr
+
+
+def test_roman_check_ignores_words_inside_tokens(tmp_path):
+    strings = [say("Hello, [partner_name]!", "mc", 1), say("Use the {color=#ffffff}door{/color}.", "mc", 2)]
+    proc = run_qa(tmp_path, strings, {"Hello, [partner_name]!": "γεια, [partner_name]!",
+                                      "Use the {color=#ffffff}door{/color}.":
+                                      "η {color=#ffffff}πόρτα{/color} door."})
+    assert "roman:partner" not in proc.stdout and "roman:color" not in proc.stdout
+    assert "roman:door" in proc.stdout

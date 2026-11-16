@@ -21,6 +21,8 @@ import json
 import sys
 from pathlib import Path
 
+import orthography
+
 from validation import (
     LANGUAGE_SCRIPT_HINTS, SCRIPT_RANGES, configure_console, write_text_atomic,
 )
@@ -266,6 +268,11 @@ def build_profile(name, language_id, language_name, output_dir):
     # codepoints with the source, so the check cannot discriminate.
     if script and SCRIPT_RANGES.get(script):
         profile["validation"]["target_script"] = script
+    # A language id that names the Chinese variant makes it the project's
+    # declared choice, so QA treats the other variant leaking in as a hard issue.
+    conventions = orthography.config({"language_id": language_id})
+    if conventions and conventions["variant"]:
+        profile["orthography"] = {"variant": conventions["variant"]}
     return profile
 
 
@@ -306,7 +313,10 @@ def main():
         pass
 
     language_id = args.language.lower()
-    language_name = args.language_name or language_id.capitalize()
+    conventions = orthography.config({"language_id": language_id})
+    variant = conventions["variant"] if conventions else None
+    language_name = args.language_name or (
+        f"{variant.capitalize()} Chinese" if variant else language_id.capitalize())
     name = args.name or game.name
 
     project.mkdir(parents=True, exist_ok=True)
@@ -367,6 +377,12 @@ Next:
      translation-guide.md, by interviewing whoever knows the game
      (references/game-profile.md)
   4. Translate (references/translating.md){script_hint}""")
+    if conventions:
+        print("\n  Chinese target: read references/chinese.md before step 3 "
+              "(variant, punctuation, fonts)." + ("" if variant else
+              "\n  ! Simplified or Traditional is not known from the language id "
+              f"'{language_id}'.\n    Set \"orthography\": {{\"variant\": ...}} in "
+              "profile.json, or use schinese / tchinese."))
 
 
 if __name__ == "__main__":

@@ -273,6 +273,20 @@
         }
       }
     },
+    "orthography": {
+      "type": ["object", "boolean"],
+      "description": "Writing conventions of the target language, shared by the translation prompt, qa_check.py and orthography.py. Built in for Chinese targets only. `false` turns the prompt rule and the checks off.",
+      "properties": {
+        "variant": {
+          "enum": ["simplified", "traditional"],
+          "description": "Which Chinese script the translation is written in. Naming it here makes a character of the other variant a category-2 QA issue; when it is only inferred from language_id (schinese, tchinese, zh_cn ...) a leak is listed for review."
+        },
+        "allow_chars": {
+          "type": "string",
+          "description": "Characters the variant check must not flag (a rare character that is legitimate in both scripts)."
+        }
+      }
+    },
     "punctuation": {
       "type": "object",
       "description": "Opt-in punctuation policy, enforced by punctuation.py and counted (informational) by qa_check.py.",
