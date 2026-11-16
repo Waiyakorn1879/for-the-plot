@@ -166,6 +166,7 @@ Also run `find_twins.py --profile profile.json` before building: it fails while 
 ## Pair audit and punctuation policy
 - **Two-speaker runs.** Register errors that belong to a *pair* (two friends sharing one fixed pronoun set) slip past speaker-only rules. Declare `"pairs": [{"name", "between": [A, B], "forbid": regex, "min_run": 3, "skip_labels": []}]` in the `qa_rules_file` and run `pair_audit.py --profile profile.json` (needs a `--no-dedupe` extract). It lists lines of every A/B-only run that match the forbidden form. Expect false positives to filter by eye: role-play, flashbacks, quoted text, a character playing someone else. It reads script order and never feeds addressee resolution (ADR-020).
 - **Exclamation marks.** Add `"punctuation": {"exclamation": {}}` to the profile to opt in. `qa_check.py` then reports how many lines carry a `!` the policy would drop (informational); `punctuation.py` previews and applies the softening. The rule is form-based, so review the dry-run for shouted lower-case lines.
+- **Chinese conventions.** For a Chinese target QA adds `zh variant` / `zh halfwidth` / `zh ellipsis` / `zh space` findings and `orthography.py --write` fixes the last three. See `chinese.md`.
 - **Thai edits.** Use `thai_text.replace_word` in edit scripts rather than `\b` or `[ะ-์]` lookarounds: Thai has no spaces and that range contains the leading vowels เ แ โ ใ ไ.
 
 ## Speaker overrides

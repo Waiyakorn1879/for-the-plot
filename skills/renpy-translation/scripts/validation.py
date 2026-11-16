@@ -153,7 +153,11 @@ SCRIPT_RANGES = {
 LANGUAGE_SCRIPT_HINTS = {
     "thai": "thai", "lao": "lao", "khmer": "khmer", "burmese": "myanmar",
     "japanese": "japanese", "chinese": "chinese", "schinese": "chinese",
-    "tchinese": "chinese", "korean": "korean",
+    "tchinese": "chinese", "zh": "chinese", "zh_cn": "chinese", "zh_tw": "chinese",
+    "zh_hk": "chinese", "zh_hans": "chinese", "zh_hant": "chinese",
+    "chinese_simplified": "chinese", "chinese_traditional": "chinese",
+    "simplified_chinese": "chinese", "traditional_chinese": "chinese",
+    "korean": "korean",
     "russian": "cyrillic", "ukrainian": "cyrillic", "bulgarian": "cyrillic",
     "serbian": "cyrillic", "greek": "greek",
     "arabic": "arabic", "persian": "arabic", "urdu": "arabic",

@@ -86,6 +86,7 @@ In Claude Code they live in `${CLAUDE_PLUGIN_ROOT}/skills/renpy-translation/scri
 | `build_patch.py` | progress JSON → patch files (`--profile`, `--translations`, `--strings`, `--out`, `--split-size`) |
 | `translation_memory.py` | Translation Memory cache + tooling (`stats` / `export` / `import` / `clean`, all `--profile`) |
 | `relationships.py` | addressee resolution + the who-speaks-to-whom report (`--profile`, `--strings`, `--report`) |
+| `orthography.py` | Chinese writing conventions: prompt rule, QA checks, fixer (`--profile`, `--write`); see `references/chinese.md` |
 | `characters.py` | character records → persona cards + QA register rules (library, no CLI) |
 | `validation.py` | shared output-validity gate + atomic writer used by the others (library, no CLI) |
 | `profile_schema.json` | JSON Schema documenting `profile.json` |

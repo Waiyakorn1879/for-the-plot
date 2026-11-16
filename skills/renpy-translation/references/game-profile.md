@@ -77,6 +77,8 @@ One source word can need three different renderings depending on who says it to 
 
 Keep `translation-guide.md` for the *reasoning* and anything prose-shaped. Two `examples` per character reach the prompt; a `note` explaining **why** a rendering is right is worth more than a third example.
 
+**Chinese target?** Read `chinese.md` now: the script variant, punctuation and name policy are decided here, and the tools check them.
+
 **3. Build the keep-untranslated list.** Character names, place names, faction/club names, branded mechanics. These go in `profile.json` `keep_untranslated` (which also whitelists them for QA's untranslated-word check).
 
 **4. Set the slang/profanity policy.** Translate intent, not words: list the source game's recurring profanity and idioms with target-language equivalents by context. State explicitly that NSFW register must not be sanitized (or whatever the user wants).

@@ -58,7 +58,8 @@ def is_monologue(text):
     rule flag, and addressee resolution (a thought has no addressee). Two
     copies of this predicate would eventually disagree about what a thought is.
     """
-    return text.startswith("(") and text.endswith(")")
+    return ((text.startswith("(") and text.endswith(")"))
+            or (text.startswith("（") and text.endswith("）")))   # full-width, CJK targets
 
 
 def resolve_alias(speakers, code, _depth=0):

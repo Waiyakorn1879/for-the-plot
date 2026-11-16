@@ -7,6 +7,7 @@ A `!` is KEPT only when the source line is ALL CAPS, contains `!!`, carries a
 shout tag (`*Shouts*`, `*Yelling*` ...), or is a short interjection (at most
 `short_words` words, default 2). Anywhere else the translation drops it:
 sentence-final `!` goes, `?!` becomes `?`, an inner `!` becomes a space.
+Full-width marks are covered too: `？！` becomes `？` and `！` becomes `。`.
 The rule is purely form-based, so a shouted lower-case line longer than
 `short_words` loses its `!`: review the dry-run.
 
@@ -60,9 +61,19 @@ def keep(source, cfg):
     return plain.strip().endswith("!") and len(words) <= cfg.get("short_words", 2)
 
 
+def bangs(text):
+    """How many exclamation marks, half- or full-width, `text` carries."""
+    return text.count("!") + text.count("！")
+
+
 def soften(translation):
     masked, toks = mask_tokens(translation)
-    s = re.sub(r"\?!+", "?", masked)
+    # Full-width marks (Chinese, Japanese). Those scripts end a sentence with a
+    # mark, so a dropped ！ becomes 。 rather than nothing.
+    s = re.sub(r"？[！!]+|[！!]+？", "？", masked)
+    s = re.sub(r"！+(?=…|—|。|，)", "", s)
+    s = re.sub(r"！+", "。", s)
+    s = re.sub(r"\?!+", "?", s)
     s = re.sub(r"!+(?=(?:" + MASK_SRC + r")+\w)", " ", s)   # Go!{w}Now: keep words apart
     s = re.sub(r"!+(?=\s*(?:\*|" + MASK_SRC + r"|\"|”|\)|$))", "", s)
     s = re.sub(r"!+\s+", " ", s)
@@ -72,7 +83,7 @@ def soften(translation):
 
 def over_policy(source, translation, cfg):
     """True if `translation` carries a `!` the policy would drop."""
-    return ("!" in mask_tokens(translation)[0] and not is_echo(source, translation)
+    return (bangs(mask_tokens(translation)[0]) and not is_echo(source, translation)
             and not keep(source, cfg))
 
 
@@ -96,7 +107,7 @@ def apply_policy(stores, cfg, gate_policy):
                 skipped += 1
                 continue
             changed[path] = changed.get(path, 0) + 1
-            marks += v.count("!") - new.count("!")
+            marks += bangs(v) - bangs(new)
             d[k] = new
     return changed, marks, skipped
 
@@ -119,7 +130,7 @@ def main():
 
     changed, marks, skipped = apply_policy(stores, cfg, validation_policy(profile, base))
     touched = {path for path, _, _ in stores if path in changed}
-    left = sum(v.count("!") for _, d, _ in stores for v in d.values())
+    left = sum(bangs(v) for _, d, _ in stores for v in d.values())
     print(f"{sum(changed.values())} entr(ies) to change, {marks} mark(s) removed, {left} remain")
     if skipped:
         print(f"{skipped} entr(ies) left alone: softening would fail the validity gate "
