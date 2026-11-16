@@ -41,7 +41,7 @@ from translation_memory import (
 from validation import (
     ESC_RE, PCT_RE, REASONS, TAG_RE, VAR_RE,
     configure_console, policy_banner, validate_translation, validation_policy,
-    write_text_atomic,
+    backup_file, write_text_atomic,
 )
 
 configure_console()
@@ -653,6 +653,8 @@ def main():
     ap.add_argument("--profile", required=True, help="profile.json")
     ap.add_argument("--strings", help="strings file (overrides profile strings_file)")
     ap.add_argument("--progress", help="progress file (overrides profile progress_file)")
+    ap.add_argument("--no-backup", action="store_true",
+                    help="do not copy the progress file aside before this run changes it")
     args = ap.parse_args()
 
     profile, base = load_profile(args.profile)
@@ -690,6 +692,18 @@ def main():
         progress = json.loads(progress_file.read_text(encoding="utf-8"))
     else:
         progress = {}  # english -> translation
+
+    backed_up = [args.no_backup or not progress]
+
+    def save_progress():
+        """Write the progress store; the first write of a run that had work to
+        lose copies the file aside first. A run that changes nothing makes no
+        backup, so re-running a finished project does not pile them up."""
+        if not backed_up[0]:
+            backed_up[0] = True
+            print(f"Backup: {backup_file(progress_file).name}")
+        write_text_atomic(progress_file,
+                          json.dumps(progress, ensure_ascii=False, indent=2))
 
     # Translation Memory: the engine only talks to TranslationMemory, never the
     # JSON file. Seed it from existing progress (free bootstrap on first run),
@@ -748,8 +762,7 @@ def main():
             tm.save()
             # Persist progress now so the early-return-when-done path below still
             # writes translations.json (the file build_patch.py consumes).
-            write_text_atomic(progress_file,
-                              json.dumps(progress, ensure_ascii=False, indent=2))
+            save_progress()
 
     todo = [e for e in strings if e["text"] not in progress]
     print(f"Total: {len(strings)} | Done: {len(progress)} | Todo: {len(todo)}")
@@ -850,8 +863,7 @@ def main():
         print(f"  Accepted {accepted}/{len(batch)}. Total done: {len(progress)}")
 
         # Save incrementally (progress + TM, atomically, per batch)
-        write_text_atomic(progress_file,
-                          json.dumps(progress, ensure_ascii=False, indent=2))
+        save_progress()
         if tm is not None:
             tm.save()
         time.sleep(0.5)  # polite

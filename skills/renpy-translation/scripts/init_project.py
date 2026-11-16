@@ -229,6 +229,9 @@ GITIGNORE = """# Game text — never commit or publish any of this.
 decompiled/
 strings.json
 translations.json
+speaker_translations.json
+speaker_translations_todo.json
+*.bak-*
 .ftp/
 output/
 QC/

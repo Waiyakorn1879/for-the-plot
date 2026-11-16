@@ -139,3 +139,11 @@ class TestRelationshipScaffold:
         _, project = run_init(tmp_path)
         text = (project / "TRANSLATION.md").read_text(encoding="utf-8")
         assert "relationships.py --profile profile.json" in text
+
+
+def test_gitignore_excludes_overrides_and_backups(tmp_path):
+    """Both are game text written by tools that came after the first template."""
+    _, project = run_init(tmp_path)
+    ignored = (project / ".gitignore").read_text(encoding="utf-8")
+    for path in ("speaker_translations.json", "speaker_translations_todo.json", "*.bak-*"):
+        assert path in ignored

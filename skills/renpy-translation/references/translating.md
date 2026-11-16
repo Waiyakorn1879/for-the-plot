@@ -18,6 +18,8 @@ Savings: 67.8%
 
 Inspect/maintain it with `translation_memory.py` (`stats`, `export`/`import` CSV, `clean`) — see `SKILL.md`. The TM contains game text: never commit or publish it. (Fuzzy/similarity matching is planned for v2.)
 
+**Backups.** The first write of a run that changes `translations.json` copies it to `translations.json.bak-<timestamp>` first (`--no-backup` skips this). A run with nothing to do makes no backup. Delete old ones when you no longer need them.
+
 **The re-translation trap.** Deleting keys from `translations.json` does **not** force re-translation — the TM resolves hits *before* batching and puts the old translation straight back, with zero model calls. To genuinely re-translate, run with `tm.enabled: false`. (`translation_memory.py clean` does not help; it only removes empty and duplicate entries.) The one thing that *is* automatic: a cached entry that echoes its source or misses the target script is rejected on lookup and re-translated, so a TM poisoned by an older run self-heals.
 
 ## Path A — in-session (recommended)

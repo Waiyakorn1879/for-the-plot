@@ -7,10 +7,25 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    # The Windows job is advisory until it has a green run on record; then
+    # delete `experimental` and it gates like the others.
+    continue-on-error: ${{ matrix.experimental || false }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.9", "3.13"]
+        include:
+          # The docs promise 3.8+. Pinned to 22.04: newer runner images are
+          # not guaranteed to carry an end-of-life interpreter.
+          - os: ubuntu-22.04
+            python-version: "3.8"
+          # Most of validation.py exists for Windows hazards (console
+          # encoding, CRLF, atomic replace); run the suite where they bite.
+          - os: windows-latest
+            python-version: "3.13"
+            experimental: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

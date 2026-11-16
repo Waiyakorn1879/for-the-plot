@@ -602,3 +602,14 @@ def test_key_spelled_the_other_way_is_not_missing(tmp_path):
     strings = [say('He said \\"hi\\".', "mc", 1), say("It’s late.", "mc", 2)]
     proc = run_qa(tmp_path, strings, {'He said "hi".': 'είπε "γεια".', "It's late.": "είναι αργά."})
     assert "MISSING" not in proc.stdout and proc.returncode == 0, proc.stdout
+
+
+def test_missing_input_file_is_a_message_not_a_traceback(tmp_path):
+    (tmp_path / "profile.json").write_text(json.dumps({"language_id": "greek"}), encoding="utf-8")
+    cmd = [sys.executable, str(SCRIPTS_DIR / "qa_check.py"), "--profile", str(tmp_path / "profile.json")]
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    assert proc.returncode == 1 and "Traceback" not in proc.stderr
+    assert "strings file not found" in proc.stderr and "extract_strings.py" in proc.stderr
+    (tmp_path / "strings.json").write_text("[]", encoding="utf-8")
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    assert "translations file not found" in proc.stderr and "Traceback" not in proc.stderr

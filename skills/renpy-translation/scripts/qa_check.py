@@ -202,6 +202,11 @@ def main():
     strings_file = Path(args.strings) if args.strings else base / profile.get("strings_file", "strings.json")
     trans_file = Path(args.translations) if args.translations else base / profile.get("progress_file", "translations.json")
 
+    # A message, not a traceback: this is the first command run in a new project.
+    for what, path, hint in (("strings", strings_file, "run extract_strings.py first"),
+                             ("translations", trans_file, "nothing has been translated yet")):
+        if not path.is_file():
+            sys.exit(f"{what} file not found: {path} ({hint})")
     strings = json.loads(strings_file.read_text(encoding="utf-8"))
     trans = json.loads(trans_file.read_text(encoding="utf-8"))
 
