@@ -1,12 +1,12 @@
 # Thai
 
-Thai has no spaces between words, gendered speech particles, and a pronoun system that depends on the relationship between speaker and listener. Read this at the Profile phase. The reference implementation is `examples/badik-thai/` (Being a DIK, about 36,000 strings): copy its structure, never its content.
+Thai has no spaces between words, gendered speech particles, and a pronoun system that depends on the relationship between speaker and listener. Read this at the Profile phase. The reference implementation is `examples/eternum-thai/` (Eternum, about 45,000 strings): copy its structure, never its content.
 
 **Language id:** `thai`. Set `validation.target_script` to `"thai"` (the scaffold does this). The Thai-specific code is `GENDER_GRAMMAR` in `scripts/characters.py` and the library `scripts/thai_text.py`; there is no `langs/` module because there are no mechanical writing conventions to fix.
 
 ## Register
 
-The pronoun belongs to the pair, not the person: the same protagonist uses one form with a close friend and another with a professor. Declare it per character and per relationship in `speakers` (`to`), as [game-profile.md](../game-profile.md) describes. `examples/badik-thai/pronoun-reference.md` and `character-profiles.md` show a full matrix.
+The pronoun belongs to the pair, not the person: the same protagonist uses one form with a close friend and another with a professor. Declare it per character and per relationship in `speakers` (`to`), as [game-profile.md](../game-profile.md) describes. `examples/eternum-thai/profile.json` (per-pair `to` blocks) and its `translation-guide.md` (a dyad table) show the matrix.
 
 ## Gender-marked speech
 

@@ -57,7 +57,7 @@ Resolved lines carry `"to": "<name>"` into the translation prompt, fill the addr
 A character who speaks under more than one code (`"???"` before introduction) gets `alias_of` on the extra code — one record, shared QA rules, no duplicate cast entries.
 
 - Spec and the interview process for building one: `references/game-profile.md`
-- Complete worked example (Being a DIK → Thai, 35+ characters): `examples/badik-thai/`
+- Complete worked example (Eternum → Thai, 15 characters shown): `examples/eternum-thai/`
 
 When starting a new game, copy the example's structure, not its content.
 

@@ -16,7 +16,7 @@ A profile is the per-game/per-language knowledge base. Everything game- or langu
 | `translation-guide.md` | translator (in-session assistant or API prompt) | registers, formality, slang policy, few-shot examples |
 | `qa_rules.json` | `qa_check.py` | declarative register checks (see `qa.md`) |
 
-Worked example: `examples/badik-thai/` — copy its **structure** for a new game, never its content.
+Worked example: `examples/eternum-thai/` — copy its **structure** for a new game, never its content.
 
 ## Building a profile: the interview
 

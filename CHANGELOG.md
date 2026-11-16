@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.4
+
+- **Chinese checks, measured and hardened.** Tested on 2,940 + 2,941 sentences of zh.wikipedia text served in both scripts (`/zh-cn/` and `/zh-tw/`, 10 articles) and on mutated copies of the same sentences:
+  - New `zh dash` (`--`, `―`, a clause-final lone `—` / `–` become `——`; a range mark such as `秦岭—淮河` is left alone), `zh width` (full-width Latin/digits), and `zh scriptword` (Simplified forms that are also Traditional characters, listed only in the words where they are wrong: 然后, 这里, 一只猫, 干净, 吃面, 与, 气; review only, never rewritten by `--repair-variant`).
+  - The half-width fix now also catches a mark after a closing bracket or quote (`”.` → `”。`), a mark before Latin or digits (`英语:The`), and a stray ` .`; smileys (`:)` `:D`) are left alone.
+  - The spacing fix removes spaces next to a tag between Chinese characters.
+
+- **Chinese fixer:** `orthography.py --write` now also removes a space that sits next to a tag between Chinese characters (`真正的{/i} 男朋友`) and converts a stray ` .` / ` !` after a Chinese character. Found by running a deliberately broken Simplified batch through the tools.
+- **Worked example is now Eternum → Thai** (`examples/eternum-thai/`: trimmed profile, style guide, QA rules, lessons learned) in place of `examples/badik-thai/`. No game text. The BaDIK-specific character and pronoun write-ups were removed.
+- **Chinese region vocabulary:** the translation prompt now names the region's words (Mainland 软件 / Taiwan 軟體 ...), and QA lists the other region's words as `zh region:...` for review (20 word pairs; off for Hong Kong with `zh_hk` or `"orthography": {"region": "hk"}`). Traditional prompts also state 《 》 for books and 〈 〉 for articles.
+
 ## 1.6.3
 
 Structure for more languages. No behaviour change; every command and import keeps its name.

@@ -10,7 +10,7 @@ A complete, battle-tested fan-translation workflow for Ren'Py visual novels, pac
 decompile → extract strings → build a game profile → translate → QA → build patch → deploy
 ```
 
-The pipeline was proven on a full Thai translation of *Being a DIK* — Episode 1 first (2,600+ strings), then carried through Episodes 1–8 (~36,000 strings, character-aware speech registers, an in-game phone-chat sub-patch, a runtime patch that coexists with mods like SanchoMod), with Season 3 in progress — and then generalized for any game and any target language.
+The pipeline was proven on full Thai translations of *Being a DIK* and *Eternum* (the latter released); the first of them — Episode 1 first (2,600+ strings), then carried through Episodes 1–8 (~36,000 strings, character-aware speech registers, an in-game phone-chat sub-patch, a runtime patch that coexists with mods like SanchoMod), with Season 3 in progress — and then generalized for any game and any target language.
 
 ## What you get
 
@@ -28,7 +28,7 @@ The pipeline was proven on a full Thai translation of *Being a DIK* — Episode 
 - **Character records** — `profile.json` → `speakers` is a real character dictionary: register, forbidden/required vocabulary, approved examples, an inner-monologue override, and **per-relationship pronouns** (in register-rich languages the pronoun belongs to the *pair*, not the person — the same protagonist uses one form with a close friend and another with a professor). Each record becomes a persona card in the translation prompt **and** a QA register rule, from one source — so the voice you asked for is the voice that gets checked. Every field is optional.
 - **Relationship records** — the other half of that: which pair applies to a given line. Resolved lines carry the addressee into the translation prompt, into the Translation Memory's variant key, and into category-3 QA rules generated from a relationship's own `forbidden` list. Unresolved lines behave exactly as before — the whole relationship table goes to the translator, who decides. `min_confidence` lets a project refuse a tier it doesn't trust, and a hand-authored `declared` scope always wins.
 - **Game profile system** — one `profile.json` + style guide per game/language pair captures characters, registers, glossary, fonts, validation, and QA rules.
-- **A complete worked example** — the *Being a DIK* → Thai profile, including a 35-character speech-register guide and the lessons learned shipping it.
+- **A complete worked example** — the *Eternum* → Thai profile (15 of its 307 speaker records, with per-pair pronouns), its style guide and QA rules, and the lessons learned shipping an earlier Thai translation.
 
 ## How it works
 
@@ -40,7 +40,7 @@ Because the dictionary is keyed on the game's own English text, the patch typica
 
 `skills/renpy-translation/examples/mini-schinese/` is a small synthetic Chinese project (profile, style guide, QA rules) built on a test fixture, with no real game text.
 
-`skills/renpy-translation/examples/badik-thai/` is a trimmed copy of the real profile behind a Thai translation of *Being a DIK* — started on EP1 (2,638 strings, 99.9%) and since carried through Episodes 1–8 (~36,000 strings, 99%+), Season 3 ongoing: a 35-character speech-register profile, a Thai pronoun matrix by relationship, declarative QA rules that catch register violations mechanically, and a lessons-learned writeup. Copy its structure — not its content — when starting your own game.
+`skills/renpy-translation/examples/eternum-thai/` is a trimmed copy of the real profile behind the released Thai translation of *Eternum* (about 45,000 source strings, 307 speaker records; 15 are kept here): per-pair Thai pronouns, a style guide with a forbidden-spelling glossary, and declarative QA rules. `lessons-learned.md` in the same folder comes from an earlier full-game Thai project (*Being a DIK*) and generalizes. Copy the structure, not the content. No game text or translations are included.
 
 ## Install
 

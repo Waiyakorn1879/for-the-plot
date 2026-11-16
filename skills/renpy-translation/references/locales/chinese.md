@@ -68,8 +68,12 @@ Chinese has no gendered particles, so no gender rule is built in. Voice is carri
 | Label | Meaning | Category |
 |---|---|---|
 | `zh variant:們這` | characters of the other script | 2 when the profile names the variant, else 4 |
+| `zh region:软体` | a word from the other region (Mainland word in Taiwan text or the reverse); `REGION_TERMS` in `langs/zh.py`, off for Hong Kong | 4 |
 | `zh halfwidth` | `, . ? ! : ;` next to a Chinese character | 4 |
 | `zh ellipsis` | `...`, `。。。` or a lone `…` | 4 |
+| `zh scriptword:后里` | a Simplified form used where Traditional needs another (Traditional projects only) | 4 |
+| `zh dash` | `--`, or a lone `—` / `–` / `―`, next to Chinese text (should be `——`) | 4 |
+| `zh width` | full-width Latin letters or digits (should be half-width) | 4 |
 | `zh space` | a space between two Chinese characters | 4 |
 
 It also lowers the default "short?" threshold to 0.10. A faithful Chinese line is often a quarter the length of its English source, and the general default of 0.28 flags most of them. Set `truncation_ratio` in `qa_rules.json` to override.
@@ -90,7 +94,7 @@ python translate_api.py --profile profile.json --repair-variant --write   # back
 
 Only the flagged lines (dictionary and speaker overrides) are sent, with the characters that are wrong named. An answer is saved only if it clears the gate a fresh translation does (tokens, echo, script, terms) **and** no longer leaks **and** is about the same length as the line it replaces, so a rewrite is refused. A refused line is retried once, then left exactly as it was and listed; the exit status is 1 while any remain. Review the dry-run before `--write`: it is a conversion, not a re-translation, but it is still model output. In-session, do the same by hand: take the `zh variant` lines from the QA report and fix them with `edit_lines.py`. A project with a different converter (OpenCC) can use it instead; nothing here depends on it.
 
-How the variant check works, and its limits: it uses Python's own GB2312 and Big5 tables. A character GB2312 has and Big5 lacks is Simplified-only; a common Big5 character GB2312 lacks is Traditional-only. It is conservative on purpose. A Simplified form that is also a real Traditional character (后 里 只 干 面) is never flagged, so a clean report does not prove the text is free of the other script. A rare character legitimate in both can be flagged: list it in `"orthography": {"allow_chars": "瞭"}`.
+How the variant check works, and its limits: it uses Python's own GB2312 and Big5 tables. A character GB2312 has and Big5 lacks is Simplified-only; a common Big5 character GB2312 lacks is Traditional-only. It is conservative on purpose. A Simplified form that is also a real Traditional character (后 里 只 干 面 气) cannot be told by table, so in a Traditional project the common wrong uses (然后, 这里, 一只猫, 干净, 吃面 and a few more; the list is `_SIMPLIFIED_USES` in `langs/zh.py`) are listed for review as `zh scriptword:...`. That label is never a hard failure and `--repair-variant` does not touch it, because 后, 只 and 面 are right in other words (母后, 只会, 方面). A line whose characters are identical in both scripts (我求之不得) cannot be judged, so a clean report does not prove the text is free of the other script. A rare character legitimate in both can be flagged: list it in `"orthography": {"allow_chars": "瞭"}`.
 
 The exclamation policy (`punctuation.py`) handles full-width marks: `？！` becomes `？` and a dropped `！` becomes `。`.
 

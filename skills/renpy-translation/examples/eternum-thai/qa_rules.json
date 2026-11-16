@@ -1,0 +1,13 @@
+{
+  "window": 12,
+  "roman_check": true,
+  "groups": {},
+  "rules": [
+    {
+      "name": "forbidden standardized spellings",
+      "category": 4,
+      "pattern": "ไปรโตเรียน|ดาลีอา|มาร์ท|จิ้งซ์|อิชาริ|ซาเมียร์|แว็กเนอร์|โคโยตี้|ดิไลลาห์|ดีไลลาห์|ประตูทางออก|เอ็กซิตพอร์ทัล|อารานนิส|ยูลิสซีส|อี-สูท|อีสูท|อี-ไวเซอร์|อีไวเซอร์"
+    }
+  ],
+  "_comment": "Character `forbidden` lists in profile.json become category-2 rules automatically — put them there, not here. Use this file for rules that depend on CONTEXT rather than on speaker identity (e.g. crude register while an authority figure is in the scene), via `near`. See references/qa.md. When tuning a rule to fire less, re-run it against lines you know violate it: in an unspaced script, suppressing a false positive routinely erases a real violation."
+}

@@ -1,0 +1,445 @@
+{
+  "game_name": "Eternum",
+  "language_id": "thai",
+  "language_name": "Thai",
+  "source_dir": "decompiled",
+  "strings_file": "strings.json",
+  "progress_file": "translations.json",
+  "output_dir": "output",
+  "style_guide_file": "translation-guide.md",
+  "qa_rules_file": "qa_rules.json",
+  "nameplates_file": "thai_nameplates.json",
+  "input_prompts_file": "input_prompts.json",
+  "font": {
+    "regular": "tl/thai/Prompt-Medium.ttf",
+    "italic": "tl/thai/Prompt-SemiBold.ttf",
+    "replace_fonts": [
+      "ade1.ttf",
+      "ade2.ttf",
+      "ade3.ttf",
+      "adeb.ttf",
+      "poiretone.ttf",
+      "Sketchzone.ttf",
+      "alwayslovely.ttf",
+      "tales5.ttf",
+      "EagleHorizon.ttf",
+      "tales.otf",
+      "balgruf.ttf"
+    ],
+    "size_scale": 1.0,
+    "text_size": 28
+  },
+  "relationships": {
+    "enabled": true,
+    "min_confidence": "dyad",
+    "declared": []
+  },
+  "keep_untranslated": [
+    "Eternum",
+    "Orion",
+    "Annie",
+    "Dalia",
+    "Nancy",
+    "Penelope",
+    "Luna",
+    "Alex",
+    "Nova",
+    "Calypso",
+    "Chang",
+    "Axel",
+    "Eva",
+    "Idriel",
+    "Lucinda",
+    "Micaela",
+    "Keating",
+    "AstroCorp",
+    "Thanatos",
+    "Krell",
+    "Warthogs",
+    "El Coyote",
+    "Kermit",
+    "Sybilla",
+    "Fangrend"
+  ],
+  "api": {
+    "provider": "openai-compatible",
+    "batch_size": 20,
+    "temperature": 0.3
+  },
+  "safe_store_files": [
+    "gallery",
+    "screens_overwrite"
+  ],
+  "input_sync": [
+    {
+      "prompt": "What is your name?",
+      "vars": {
+        "mcshort": "name[:2]",
+        "mc_dash": "u'{}-{}'.format(name[0].upper(), name)",
+        "namelong": "name[-1] * 5",
+        "noflmc": "name[1:] if len(name) > 1 else ''"
+      }
+    }
+  ],
+  "toggle_key": "K_F10",
+  "speakers": {
+    "mc": {
+      "name": "Orion",
+      "gender": "male",
+      "role": "Protagonist / Main Character",
+      "register": "18-20 year old male, adaptable casual/polite",
+      "self_pronoun": "ผม / ฉัน",
+      "address_pronoun": "เธอ / นาย",
+      "called": [
+        "Orion"
+      ],
+      "monologue": {
+        "self_pronoun": "ฉัน / เรา"
+      },
+      "to": {
+        "a": {
+          "self_pronoun": "ฉัน / เรา",
+          "address_pronoun": "เธอ / แอนนี่",
+          "note": "close childhood friend, warm & playful"
+        },
+        "d": {
+          "self_pronoun": "ฉัน / เรา",
+          "address_pronoun": "เธอ / ดาเลีย",
+          "note": "feisty banter, teasing"
+        },
+        "n": {
+          "self_pronoun": "ผม / ฉัน",
+          "address_pronoun": "คุณแนนซี่ / เธอ",
+          "note": "flirty & respectful to mature woman"
+        },
+        "p": {
+          "self_pronoun": "ฉัน / เรา",
+          "address_pronoun": "เธอ / เพเนโลปี",
+          "note": "gentle, supportive & cute nerd banter"
+        },
+        "l": {
+          "self_pronoun": "ฉัน / เรา",
+          "address_pronoun": "เธอ / ลูน่า",
+          "note": "intriguing, playful goth banter"
+        },
+        "x": {
+          "self_pronoun": "ฉัน / เรา",
+          "address_pronoun": "เธอ / อเล็กซ์",
+          "note": "tomboy gym bro to romantic spark"
+        },
+        "no": {
+          "self_pronoun": "ฉัน / ผม",
+          "address_pronoun": "เธอ / โนวา",
+          "note": "dealing with haughty rich girl, teasing back"
+        },
+        "ca": {
+          "self_pronoun": "ข้า / ผม",
+          "address_pronoun": "ท่าน / เจ้า / คาลิปโซ",
+          "note": "fantasy setting / high elf reverent to intimate"
+        },
+        "c": {
+          "self_pronoun": "ฉัน / กรอง",
+          "address_pronoun": "แก / นาย / ชาง",
+          "note": "best bro banter, uncensored jokes"
+        }
+      },
+      "thai_name": "โอไรออน"
+    },
+    "a": {
+      "name": "Annie",
+      "gender": "female",
+      "role": "Childhood Friend / Main Love Interest",
+      "called": [
+        "Annie"
+      ],
+      "register": "sweet, energetic, affectionate, cheerful",
+      "self_pronoun": "ฉัน / แอนนี่",
+      "address_pronoun": "นาย / เธอ",
+      "to": {
+        "mc": {
+          "self_pronoun": "ฉัน / แอนนี่",
+          "address_pronoun": "นาย / โอไรออน",
+          "note": "warm, playful, deeply affectionate"
+        }
+      },
+      "thai_name": "แอนนี่"
+    },
+    "d": {
+      "name": "Dalia",
+      "gender": "female",
+      "role": "Athletic / Feisty Love Interest",
+      "called": [
+        "Dalia"
+      ],
+      "register": "bold, tomboyish, direct, energetic",
+      "self_pronoun": "ฉัน",
+      "address_pronoun": "นาย",
+      "to": {
+        "mc": {
+          "self_pronoun": "ฉัน",
+          "address_pronoun": "นาย",
+          "note": "feisty, punches arms, competitive banter"
+        }
+      },
+      "thai_name": "ดาเลีย"
+    },
+    "n": {
+      "name": "Nancy",
+      "gender": "female",
+      "role": "Mature / Sensual Love Interest",
+      "called": [
+        "Nancy"
+      ],
+      "register": "flirty, seductive, confident, caring",
+      "self_pronoun": "ฉัน / แนนซี่",
+      "address_pronoun": "เธอ / นาย",
+      "to": {
+        "mc": {
+          "self_pronoun": "ฉัน / แนนซี่",
+          "address_pronoun": "เธอ / พ่อหนุ่ม",
+          "note": "teasing older woman dynamic"
+        }
+      },
+      "thai_name": "แนนซี่"
+    },
+    "p": {
+      "name": "Penelope",
+      "gender": "female",
+      "role": "Nerdy / Hacker Love Interest",
+      "called": [
+        "Penelope",
+        "Penny"
+      ],
+      "register": "shy, clever, adorable, tech geek",
+      "self_pronoun": "ฉัน / เพเนโลปี",
+      "address_pronoun": "นาย / เธอ",
+      "to": {
+        "mc": {
+          "self_pronoun": "ฉัน / เพเนโลปี",
+          "address_pronoun": "นาย / โอไรออน",
+          "note": "sweetly flustered & nerdy warmth"
+        }
+      },
+      "thai_name": "เพเนโลพี"
+    },
+    "l": {
+      "name": "Luna",
+      "gender": "female",
+      "role": "Goth / Mysterious Love Interest",
+      "called": [
+        "Luna"
+      ],
+      "register": "deadpan, dry wit, subtle tenderness, sarcastic",
+      "self_pronoun": "ฉัน / ลูน่า",
+      "address_pronoun": "นาย",
+      "to": {
+        "mc": {
+          "self_pronoun": "ฉัน / ลูน่า",
+          "address_pronoun": "นาย",
+          "note": "dark humor, teasing, genuine care underneath"
+        }
+      },
+      "thai_name": "ลูน่า"
+    },
+    "x": {
+      "name": "Alex",
+      "gender": "female",
+      "role": "Outgoing / Sporty Love Interest",
+      "called": [
+        "Alex"
+      ],
+      "register": "straightforward, active, friendly, passionate",
+      "self_pronoun": "ฉัน / อเล็กซ์",
+      "address_pronoun": "นาย",
+      "to": {
+        "mc": {
+          "self_pronoun": "ฉัน / อเล็กซ์",
+          "address_pronoun": "นาย",
+          "note": "gym buddy turned passionate romantic interest"
+        }
+      },
+      "thai_name": "อเล็กซ์"
+    },
+    "no": {
+      "name": "Nova",
+      "gender": "female",
+      "role": "Rich / High-status Love Interest",
+      "called": [
+        "Nova"
+      ],
+      "register": "haughty, elegant, sharp-tongued tsundere",
+      "self_pronoun": "ฉัน / โนวา",
+      "address_pronoun": "นาย",
+      "to": {
+        "mc": {
+          "self_pronoun": "ฉัน / โนวา",
+          "address_pronoun": "นาย",
+          "note": "initially looking down on him, gradually softening"
+        }
+      },
+      "thai_name": "โนวา"
+    },
+    "ca": {
+      "name": "Calypso",
+      "gender": "female",
+      "role": "High Elf / Fantasy Love Interest",
+      "called": [
+        "Calypso"
+      ],
+      "register": "archaic, formal, noble, graceful",
+      "self_pronoun": "ข้า / ฉัน",
+      "address_pronoun": "เจ้า / ท่าน / นาย",
+      "to": {
+        "mc": {
+          "self_pronoun": "ข้า / ฉัน",
+          "address_pronoun": "เจ้า / ท่าน / โอไรออน",
+          "note": "majestic high elf manner"
+        }
+      },
+      "thai_name": "คาลิปโซ"
+    },
+    "c": {
+      "name": "Chang",
+      "gender": "male",
+      "role": "Best Friend / Comic Relief",
+      "called": [
+        "Chang"
+      ],
+      "register": "super casual bro, funny, unfiltered",
+      "self_pronoun": "ฉัน / ข้า",
+      "address_pronoun": "แก / นาย",
+      "to": {
+        "mc": {
+          "self_pronoun": "ฉัน / ข้า",
+          "address_pronoun": "แก / นาย / มึง(ถ้าเพื่อนสนิท)",
+          "note": "ultimate bro talk"
+        }
+      },
+      "thai_name": "ชาง"
+    },
+    "eva": {
+      "name": "Eva",
+      "gender": "female",
+      "role": "Eternum AI Assistant",
+      "called": [
+        "Eva"
+      ],
+      "register": "polite, helpful, synthetic",
+      "thai_name": "เอวา"
+    },
+    "id": {
+      "name": "Idriel",
+      "gender": "female",
+      "role": "Celestial Being",
+      "called": [
+        "Idriel"
+      ],
+      "register": "divine, solemn",
+      "thai_name": "ไอเดรียล"
+    },
+    "luc": {
+      "name": "Lucinda",
+      "gender": "female",
+      "role": "Teacher / Authority",
+      "called": [
+        "Lucinda"
+      ],
+      "register": "professional, caring",
+      "thai_name": "ลูซินด้า"
+    },
+    "mi": {
+      "name": "Micaela",
+      "gender": "female",
+      "role": "Classmate",
+      "called": [
+        "Micaela"
+      ],
+      "register": "friendly, cute",
+      "thai_name": "มิคาเอล่า"
+    },
+    "prof": {
+      "name": "Professor Keating",
+      "gender": "male",
+      "role": "University Professor",
+      "called": [
+        "Keating"
+      ],
+      "register": "formal, academic",
+      "thai_name": "ศาสตราจารย์คีทติ้ง"
+    }
+  },
+  "character_names_thai": {
+    "Orion": "โอไรออน",
+    "Annie": "แอนนี่",
+    "Chang": "ชาง",
+    "Nancy": "แนนซี่",
+    "Dalia": "ดาเลีย",
+    "Penelope": "เพเนโลพี",
+    "Luna": "ลูน่า",
+    "Alex": "อเล็กซ์",
+    "Nova": "โนวา",
+    "Calypso": "คาลิปโซ",
+    "Idriel": "ไอเดรียล",
+    "Eva": "เอวา",
+    "Thanatos": "ธานาทอส",
+    "Lucinda": "ลูซินด้า",
+    "Micaela": "มิคาเอล่า",
+    "Axel": "แอกเซล",
+    "El Coyote": "เอล โคโยตี้",
+    "Fangrend": "แฟงเกรนด์",
+    "Sybilla": "ซีบิลล่า"
+  },
+  "validation": {
+    "allow_identical": [
+      "Alt+A"
+    ]
+  },
+  "store_defaults": {
+    "mc": "Orion",
+    "lastname": "Richards",
+    "mcshort": "Or",
+    "namelong": "nnnnn",
+    "mc_dash": "O-Orion",
+    "noflmc": "rion",
+    "alexkisswest": false,
+    "anniepath": 0
+  },
+  "nameplate_patterns": [
+    {
+      "suffix": "'s Echo",
+      "format": "เสียงสะท้อนของ {base}"
+    },
+    {
+      "suffix": "'s intrusive thoughts",
+      "format": "ความคิดในหัวของ {base}"
+    },
+    {
+      "suffix": "'s Dad",
+      "format": "พ่อของ{base}"
+    },
+    {
+      "suffix": "'s father",
+      "format": "พ่อของ{base}"
+    },
+    {
+      "suffix": "'s Mom",
+      "format": "แม่ของ{base}"
+    },
+    {
+      "suffix": "'s mother",
+      "format": "แม่ของ{base}"
+    },
+    {
+      "suffix": "'s grandma",
+      "format": "ย่า/ยายของ{base}"
+    },
+    {
+      "suffix": "'s uncle",
+      "format": "ลุงของ{base}"
+    },
+    {
+      "suffix": "'s wife",
+      "format": "ภรรยาของ{base}"
+    }
+  ]
+}

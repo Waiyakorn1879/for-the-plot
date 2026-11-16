@@ -26,8 +26,8 @@ def test_config_by_language_id_and_profile():
 def test_variant_leaks_both_ways_and_shared_characters_pass():
     assert o.wrong_variant("我們这样說", SC) == "們說"
     assert o.wrong_variant("我們这样說", TC) == "这样"
-    # 后 里 只 面 干 are real Traditional characters too: never flagged
-    assert o.wrong_variant("后面只有里面干", TC) == ""
+    # 后 里 只 面 干 气 are real Traditional characters too: the table never flags them
+    assert o.wrong_variant("然后在这里一只猫", TC) == "这猫"
     # the same text in each script is clean in its own variant
     assert o.wrong_variant("这是为了我们的国家，请听他说话。", SC) == ""
     assert o.wrong_variant("這是為了我們的國家，請聽他說話。", TC) == ""
@@ -343,3 +343,52 @@ def test_repair_is_for_chinese_only(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as e:
         translate_api.main()
     assert "for Chinese targets" in str(e.value.code)
+
+
+def test_region_vocabulary_is_flagged_for_review_in_both_directions():
+    assert "region:软体" in o.issues("请装软体。", SC)
+    assert not [i for i in o.issues("请装软件。", SC) if i.startswith("region")]
+    assert "region:軟件" in o.issues("請裝軟件。", TC)
+    assert not [i for i in o.issues("請裝軟體。", TC) if i.startswith("region")]
+    # a word both sides use is never flagged
+    assert not [i for i in o.issues("看影片。", SC) if i.startswith("region")]
+    # Hong Kong text and tokens are left alone
+    hk = o.config({"language_id": "zh_hk"})
+    assert not [i for i in o.issues("請裝軟件。", hk) if i.startswith("region")]
+    assert not [i for i in o.issues("[軟件]", TC) if i.startswith("region")]
+    assert o.severity("region:软体", SC) == 4
+    assert "Vocabulary is Taiwan" in o.prompt_rule({"language_id": "tchinese"})
+
+
+def test_spaces_around_tags_and_a_stray_period_are_fixed_and_latin_kept():
+    assert o.normalize("你其实没有 {i}真正的{/i} 男朋友吧...?") == "你其实没有{i}真正的{/i}男朋友吧……？"
+    assert o.normalize("这是 mac 的错 , 不是我的 .") == "这是 mac 的错，不是我的。"
+    assert o.normalize("我爱 Python 和 Rust，买了 3.5 个") == "我爱 Python 和 Rust，买了 3.5 个"
+    assert o.normalize("你 [mc] 好") == "你 [mc] 好"
+    for t in ("你 好 {i}吗{/i} .", "他说 : 好 !"):
+        assert not o.issues(o.normalize(t), SC)
+
+
+def test_dash_width_and_emoticons():
+    assert o.normalize("喂--等等") == "喂——等等"
+    assert o.normalize("岛屿—") == "岛屿——"
+    assert o.normalize("喂——等等") == "喂——等等"
+    assert o.normalize("a--b") == "a--b" and o.normalize("2020—2021年") == "2020—2021年"
+    assert o.normalize("Ｈｅｌｌｏ１２３你好") == "Hello123你好"
+    assert o.normalize("哈哈:)好 XD (;_;)") == "哈哈:)好 XD (;_;)"
+    assert o.normalize("你好,Alex") == "你好，Alex"
+    assert {"dash", "width"} <= set(o.issues("喂--Ａ你好", SC))
+
+
+def test_scriptword_is_review_only_and_quiet_on_correct_traditional():
+    label = [i for i in o.issues("然后在這裡。一只貓很生气。", TC) if i.startswith("scriptword")][0]
+    assert set(label.split(":")[1]) == set("后只气")
+    assert "scriptword:与" in o.issues("你与我", TC)
+    assert o.severity("scriptword:后", TC) == 4
+    for ok in ("這只會讓事情更糟", "這只不過是", "那只怕", "這只需要五分鐘", "這方面包括", "裡面包著",
+               "母后", "天后", "你與我", "影后", "后冠", "皇后駕到", "他走了十公里", "村里長大", "表面上很好"):
+        assert not [i for i in o.issues(ok, TC) if i.startswith(("scriptword", "variant"))], ok
+    assert not [i for i in o.issues("然后在这里", SC) if i.startswith("scriptword")]
+    assert o.wrong_variant("母后", TC) == ""      # repair never targets it
+    assert "dash" in o.issues("岛屿–", SC)
+    assert o.normalize("Lost S–") == "Lost S–" and o.normalize("岛屿–") == "岛屿——"

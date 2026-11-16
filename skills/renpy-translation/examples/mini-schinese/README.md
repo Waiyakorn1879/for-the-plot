@@ -1,6 +1,6 @@
 # mini-schinese: a worked Chinese example
 
-A small **synthetic** example, the Chinese counterpart to `badik-thai`. The game is the fixture in `tests/fixtures/`, written for this repository, so there is no real game text here and no translation dictionary. Copy the structure, not the content.
+A small **synthetic** example, the Chinese counterpart to `eternum-thai`. The game is the fixture in `tests/fixtures/`, written for this repository, so there is no real game text here and no translation dictionary. Copy the structure, not the content.
 
 | File | Shows |
 |---|---|

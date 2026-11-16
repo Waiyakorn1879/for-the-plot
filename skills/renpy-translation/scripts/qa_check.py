@@ -16,7 +16,7 @@ Built-in review checks (category 4 — language-agnostic, skipped by --technical
   - short?: translation suspiciously shorter than the source (possible truncation)
 
 Declarative register rules (categories 2/3/4 — from the profile's qa_rules_file):
-  See references/qa.md and examples/badik-thai/qa_rules.json. Each rule is a
+  See references/qa.md and examples/eternum-thai/qa_rules.json. Each rule is a
   regex over the translation, optionally restricted to certain speakers and/or
   conditioned on which characters appear nearby in the script (context window),
   which is how relationship-dependent registers (pronouns, formality) are checked.
