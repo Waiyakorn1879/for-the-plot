@@ -11,6 +11,7 @@ Fixes from a review of the 1.6.1 tools. No data format changes. QA is stricter, 
 - **`qa_check.py` finds a key spelled the other way** (escaped quote, curly apostrophe), as `edit_lines.py` and `pair_audit.py` already did, instead of reporting it MISSING.
 - **`edit_lines.py` exits 1 when an edit is REJECTED** (edits that pass are still applied), matching `speaker_overrides.py merge`.
 - **`find_twins.py` also checks the speaker overrides file.**
+- **`build_patch.py` emits each key under the other apostrophe spelling too** (`It’s` / `It's`), for the dictionary and for speaker overrides. The runtime filter matches exactly, so a key typed with the wrong apostrophe used to leave that line in English. A spelling that is already a key of its own is never overwritten; the dict file gains one extra block and is otherwise unchanged.
 
 ## 1.6.1
 

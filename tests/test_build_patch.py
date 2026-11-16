@@ -325,3 +325,32 @@ def test_bad_speaker_overrides_are_not_shipped(tmp_path):
     built = (tmp_path / "out" / "tl" / "thai" / "01_thai_dict.rpy").read_text(encoding="utf-8")
     assert "(u'c', u'Thanks [n].'): u'ขอบคุณครับ [n]'" in built
     assert "(u'a'," not in built and "(u'b'," not in built
+
+
+def test_alternate_apostrophe_spellings():
+    import build_patch as bp
+    alts = bp.alternate_spellings(["It’s late.", "Don't go.", 'She said \\"it\'s\\".',
+                                   "Plain.", "We're in.", "We’re in."])
+    assert alts == {"It's late.": "It’s late.", "Don’t go.": "Don't go.",
+                    'She said \\"it’s\\".': 'She said \\"it\'s\\".'}
+    # an escaped apostrophe is left alone, and a spelling that only differs by
+    # quote escaping from a real key is that key at runtime: not emitted
+    assert bp.alternate_spellings(["Rock \\'n roll"]) == {}
+    assert bp.alternate_spellings(['It’s \\"x\\"', 'It\'s "x"']) == {}
+
+
+def test_alternates_are_emitted_and_load_as_the_same_translation():
+    import build_patch as bp
+    tr = {"It’s late.": "A", "Plain.": "B", "Don't.": "C"}
+    sp = {("a", "It’s late."): "A2"}
+    files = dict(bp.build_dict_rpy(tr, "x", "X", chunk=2, speaker_translations=sp))
+    assert "alternate apostrophe" in files[0] and "alternate apostrophe" not in files[1]
+    ns = {"_x_translations": {}, "_x_speaker_translations": {}}
+    for content in files.values():
+        body = content.split("init 0 python:\n", 1)[1]
+        exec("\n".join(l[4:] for l in body.split("\n")), ns)
+    assert ns["_x_translations"] == {**tr, "It's late.": "A", "Don’t.": "C"}
+    assert ns["_x_speaker_translations"] == {**sp, ("a", "It's late."): "A2"}
+    # nothing to add -> output is unchanged from before this feature
+    plain = dict(bp.build_dict_rpy({"Plain.": "B"}, "x", "X"))[0]
+    assert "alternate" not in plain and plain.count(".update(") == 1
