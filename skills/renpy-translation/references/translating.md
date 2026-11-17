@@ -72,7 +72,7 @@ Pick the provider in the profile (`api.provider`):
 |---|---|---|---|
 | `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-v4-flash` | DeepSeek's official API, pre-configured. Thinking mode **off** by default — see below. |
 | `openai-compatible` | `api.base_url` + a key in `api.api_key_env` | `gpt-4o-mini` | Any other OpenAI Chat Completions endpoint. **No SDK to install** — stdlib HTTP only. |
-| `gemini` | `pip install google-genai`, `GEMINI_API_KEY` | `gemini-2.5-pro` | The original BaDIK pipeline provider. |
+| `gemini` | `pip install google-genai`, `GEMINI_API_KEY` | `gemini-2.5-pro` | The provider the original pipeline used. |
 | `anthropic` | `pip install anthropic`, `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` | Fast, high register quality. |
 | `claude-cli` (the "agent" method) | Claude Code installed | `sonnet` | **No API key** — headless `claude -p` on an existing subscription. Each spawned agent re-pays its own context overhead, so it finishes fewer strings per unit of quota than in-session. Offer it when no key is available and the user doesn't want to translate in-session. |
 

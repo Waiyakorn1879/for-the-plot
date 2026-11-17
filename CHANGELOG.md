@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.5
+
+- **Eternum is the only showcased game.** Removed `examples/eternum-thai/lessons-learned.md`: it was a write-up of the earlier *Being a DIK* project, with that game's pronoun rules, numbers, cast and fonts, sitting inside the Eternum example. The README and the landing page now name Eternum alone, `references/locales/thai.md` quotes Eternum's font settings (Prompt Medium, `size_scale` 1.0, `text_size` 28) instead of BaDIK's, and the remaining game-name mentions in the references and the profile schema example are gone. Git history still holds the older files.
+
 ## 1.6.4
 
 - **Chinese checks, measured and hardened.** Tested on 2,940 + 2,941 sentences of zh.wikipedia text served in both scripts (`/zh-cn/` and `/zh-tw/`, 10 articles) and on mutated copies of the same sentences:

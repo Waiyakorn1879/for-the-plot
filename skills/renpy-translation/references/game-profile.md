@@ -83,7 +83,7 @@ Keep `translation-guide.md` for the *reasoning* and anything prose-shaped. Two `
 
 **4. Set the slang/profanity policy.** Translate intent, not words: list the source game's recurring profanity and idioms with target-language equivalents by context. State explicitly that NSFW register must not be sanitized (or whatever the user wants).
 
-**5. Pick fonts (non-Latin targets).** Find a font covering the target script with a license that allows redistribution (Noto covers almost everything; the locale file lists known-good choices). Test it at the game's dialog size; if it renders smaller than the original font, set `font.size_scale` (the Thai project needed 1.3, see [locales/thai.md](locales/thai.md)). List the game's original font files (from `gui.rpy`/`gui.rpa`) in `font.replace_fonts`. **Don't commit font files to a repo — link to their source.**
+**5. Pick fonts (non-Latin targets).** Find a font covering the target script with a license that allows redistribution (Noto covers almost everything; the locale file lists known-good choices). Test it at the game's dialog size; if it renders smaller than the original font, set `font.size_scale` (the locale file lists the values that worked, e.g. [locales/thai.md](locales/thai.md)). List the game's original font files (from `gui.rpy`/`gui.rpa`) in `font.replace_fonts`. **Don't commit font files to a repo — link to their source.**
 
 **6. Decide toggle/auto-set.** If the game's Preferences has no language picker, set `auto_set_language: true` and a `toggle_key` so players can flip languages in-game.
 

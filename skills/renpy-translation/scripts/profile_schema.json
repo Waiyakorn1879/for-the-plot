@@ -7,7 +7,7 @@
   "properties": {
     "game_name": {
       "type": "string",
-      "description": "Display name of the game, e.g. \"Being a DIK\""
+      "description": "Display name of the game, e.g. \"Eternum\""
     },
     "language_id": {
       "type": "string",

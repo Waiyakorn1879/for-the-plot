@@ -1,6 +1,6 @@
 # Translating custom text subsystems (phones, computers, social feeds)
 
-Text produced by game-specific Python code — chat messages assembled in functions, feed posts stored in lists, computer-screen content — never passes through `say_menu_text_filter`, and usually isn't a literal that `translate strings` can see either. Each such subsystem needs a small wrapper layer. This pattern shipped in production for Being a DIK's phone chat (two seasons of it), so the recipe below is proven.
+Text produced by game-specific Python code — chat messages assembled in functions, feed posts stored in lists, computer-screen content — never passes through `say_menu_text_filter`, and usually isn't a literal that `translate strings` can see either. Each such subsystem needs a small wrapper layer. This pattern shipped in production for a game's phone chat (two seasons of it), so the recipe below is proven.
 
 **Designed for translators, not programmers:** you copy two files, and the only thing you ever edit is **text inside quotation marks** between the `EDIT ONLY` markers. Never change indentation, never rename anything outside quotes.
 
@@ -105,4 +105,4 @@ A few games produce text in ways the two helpers don't fit (dicts of messages, t
 
 ## Scoping
 
-Inventory subsystems during extraction (see `extraction.md`) and agree scope with the user **before** translating the main script — per subsystem this is hours, not minutes. Typical scope cut in BaDIK: phone chat in, GUI/menus and mod UI out.
+Inventory subsystems during extraction (see `extraction.md`) and agree scope with the user **before** translating the main script — per subsystem this is hours, not minutes. A typical scope cut: phone chat in, GUI/menus and mod UI out.
