@@ -25,9 +25,9 @@ When `language_id` is `thai`, the prompt and QA both know the gender grammar:
 
 ## Fonts and layout
 
-Values from the Being a DIK project; treat them as a starting point and measure in the engine:
+Values from the Eternum profile (`examples/eternum-thai/profile.json`); treat them as a starting point and measure in the engine:
 
-- The original game fonts have no Thai glyphs. Set `font.regular` (the project used TH Krub Bold) and list the game's font files in `font.replace_fonts`.
-- TH Krub rendered smaller than the original font, so `font.size_scale` was 1.3. Dialogue often needs `font.text_size` around 28 ([patching.md](../patching.md)).
+- The original game fonts have no Thai glyphs. Set `font.regular` (Eternum used Prompt Medium, with Prompt SemiBold as the italic) and list the game's font files in `font.replace_fonts` (Eternum lists eleven).
+- Eternum runs with `font.size_scale` 1.0 and `font.text_size` 28 ([patching.md](../patching.md)). A different Thai font can render smaller than the original one: raise `size_scale` if it does.
 - Stacked vowels and tone marks exceed Latin-derived ascent and descent, so wrapped lines can collide. Engines without a dictionary for unspaced scripts can also treat a whole sentence as one unbreakable word. Both are pre-flight checks in [engine-seam.md](../engine-seam.md).
 - Check a sample of every episode in the running game: [verify-in-engine.md](../verify-in-engine.md).

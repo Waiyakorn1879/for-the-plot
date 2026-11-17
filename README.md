@@ -10,7 +10,7 @@ A complete, battle-tested fan-translation workflow for Ren'Py visual novels, pac
 decompile → extract strings → build a game profile → translate → QA → build patch → deploy
 ```
 
-The pipeline was proven on full Thai translations of *Being a DIK* and *Eternum* (the latter released); the first of them — Episode 1 first (2,600+ strings), then carried through Episodes 1–8 (~36,000 strings, character-aware speech registers, an in-game phone-chat sub-patch, a runtime patch that coexists with mods like SanchoMod), with Season 3 in progress — and then generalized for any game and any target language.
+The pipeline was proven on a full Thai translation of *Eternum* (released; about 45,000 source strings and 307 speaker records, with per-pair Thai pronouns), and then generalized for any game and any target language.
 
 ## What you get
 
@@ -40,7 +40,7 @@ Because the dictionary is keyed on the game's own English text, the patch typica
 
 `skills/renpy-translation/examples/mini-schinese/` is a small synthetic Chinese project (profile, style guide, QA rules) built on a test fixture, with no real game text.
 
-`skills/renpy-translation/examples/eternum-thai/` is a trimmed copy of the real profile behind the released Thai translation of *Eternum* (about 45,000 source strings, 307 speaker records; 15 are kept here): per-pair Thai pronouns, a style guide with a forbidden-spelling glossary, and declarative QA rules. `lessons-learned.md` in the same folder comes from an earlier full-game Thai project (*Being a DIK*) and generalizes. Copy the structure, not the content. No game text or translations are included.
+`skills/renpy-translation/examples/eternum-thai/` is a trimmed copy of the real profile behind the released Thai translation of *Eternum* (about 45,000 source strings, 307 speaker records; 15 are kept here): per-pair Thai pronouns, a style guide with a forbidden-spelling glossary, and declarative QA rules. Copy the structure, not the content. No game text or translations are included.
 
 ## Install
 
