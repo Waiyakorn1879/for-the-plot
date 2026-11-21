@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.5
+
+From a field report on a finished 26,800-string project (a release-candidate patch whose first external tester crashed on loading a save).
+
+- **Breaking: `build_patch.py` defaults to `--layout flat`** and writes `<out>/<lang>_patch/` (deploy to `game/<lang>_patch/`). Init code under `game/tl/<lang>/` loads late, and its store variables are missing after a save-load, so the config callbacks raise `NameError`. `--layout tl` keeps the old `<out>/tl/<lang>/`. **Upgrading a deployed patch: delete the old folder first**, or both load and crash on duplicate definitions.
+- **New `references/release.md`** (packaging, upgrade path, credit and watermark, what never to publish). `verify-in-engine.md` gains the driver traps and an eight-step **release smoke checklist** led by "load a save".
+- **Coverage audit** in `extraction.md`: short strings, Python-API strings, screen data, engine-mutated text, engine dump diff. Never claim a subsystem is fully translated without an engine-level or visual check.
+- **Runtime-hook facts** in `patching.md`: `replace_text` receives segments between tags, engine text is unescaped, chain hooks, swallowed exceptions, first-launch language switch, main-menu credit, name data, baked-in image text.
+- **`translating.md`** records the bulk-translator failure modes and the review loop. **`locales/thai.md`** adds unspaced line breaking, zero-width characters, `kerning`, PIL shaping.
+- Not yet tooling (documented only): `extract_strings.py --calls`, segment-key emission in `build_patch.py`, a smoke-driver template, `softwrap`, a keep-English allow-list.
+
 ## 1.6.4
 
 - **Eternum is the only showcased game.** Removed `examples/eternum-thai/lessons-learned.md`: it was a write-up of the earlier *Being a DIK* project, with that game's pronoun rules, numbers, cast and fonts, sitting inside the Eternum example. The README and the landing page now name Eternum alone, `references/locales/thai.md` quotes Eternum's font settings (Prompt Medium, `size_scale` 1.0, `text_size` 28) instead of BaDIK's, and the remaining game-name mentions in the references and the profile schema example are gone. Git history still holds the older files.

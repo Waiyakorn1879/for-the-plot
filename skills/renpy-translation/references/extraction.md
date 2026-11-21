@@ -43,3 +43,17 @@ After extraction, grep the sources for `renpy.say`, list-of-strings assignments,
 
 - **Say grammar.** Attributes (`a happy "Hi"`) and trailers (`with dissolve`, `nointeract`, `id x`, `(args)`) are all accepted. A dialogue-shaped line that still matches nothing is printed as `WARNING: … NOT extracted` — read it before translating; a skipped line is never seen by QA.
 - **Shared texts.** Dedupe keeps one entry per text; if several characters say it, the entry carries `also_spoken_by`. One translation serves all of them, so the translator is told to write it neutrally when their genders differ (languages with gendered speech), and QA checks it against every speaker.
+
+## Coverage audit (v1.6.5)
+
+"Extraction finished" is not "everything is covered". On a real project five classes of text were found only late, each by a screenshot. Check these before translating, and never tell the user a subsystem is "100% translated" without an engine-level or visual check:
+
+1. **Short strings.** Any filter that skips strings with fewer than two ASCII letters drops `I-`, `Penelope?`, `I'm [name].`. Keep them.
+2. **Python-API strings.** Grep the decompiled sources for calls that take a plain English literal (`new_message`, `add_reply`, `new_post`, `notify`) and put them in a batch of their own with the surrounding lines and the contact, so pronouns resolve. They reach neither `say` nor `translate strings`; see `custom-subsystems.md`.
+3. **Screen data.** Tuples and lists of string literals in `default` / `define` that feed a `text` displayable (tutorial boxes). List string literals inside `screen` blocks that are not `_()`-wrapped and not matched, for human triage.
+4. **Engine-mutated text.** See `patching.md` (runtime-hook facts).
+5. **Engine dump diff.** Dump the say statements a real run executes and diff against `strings.json`.
+
+Then walk every screen reachable without playing (settings, save/load, history, gallery, phone apps, achievements, tutorials, credits). Put what is **not** covered into the delivered README, not only into chat.
+
+Decompile from the `.rpa`, never from loose `.rpy` in the install: loose scripts can be stale (one said 1.4.18 while the archives were 1.5.18). If the game's bundled `unrpyc` crashes on screen files, use upstream `unrpyc`. Check that the extractor accepts menu choices with arguments (`"Choice"(x=1):`) and `say ... with <transition>`, and does not read style properties (`font "x"`, `color "#..."`) as speakers: a skipped form is a silent gap.

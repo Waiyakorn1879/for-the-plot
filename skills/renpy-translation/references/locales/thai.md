@@ -31,3 +31,11 @@ Values from the Eternum profile (`examples/eternum-thai/profile.json`); treat th
 - Eternum runs with `font.size_scale` 1.0 and `font.text_size` 28 ([patching.md](../patching.md)). A different Thai font can render smaller than the original one: raise `size_scale` if it does.
 - Stacked vowels and tone marks exceed Latin-derived ascent and descent, so wrapped lines can collide. Engines without a dictionary for unspaced scripts can also treat a whole sentence as one unbreakable word. Both are pre-flight checks in [engine-seam.md](../engine-seam.md).
 - Check a sample of every episode in the running game: [verify-in-engine.md](../verify-in-engine.md).
+
+## Line breaking and rendering (v1.6.5)
+
+- **Ren'Py wraps only at spaces.** In fixed-width boxes (tutorials, phone bubbles) Thai overflows. Insert a space at word boundaries every ~30 characters with `pythainlp.word_tokenize` for UI boxes; dialogue is fine with the translator's own phrase spacing.
+- **Zero-width characters** (ZWSP etc.) are missing from common Thai fonts and show as tofu. Check the font's cmap before using any invisible character, including for watermarks.
+- **Do not use `kerning`** (it detaches vowels and tone marks) and avoid faux bold on small text. Map *every* font the game references (scan the decompiled sources) to the Thai files; tiny styles (phone comments, achievements) need a `translate <lang> style <name>: size N` block.
+- **PIL without libraqm cannot shape Thai**; render promo text in a browser or reuse real screenshots. Image-generation models mangle Thai text.
+- Register belongs to the speaker pair *and* mood (กู/มึง in anger, ฉัน/นาย when calm); ค่ะ/คะ/ครับ follow speaker gender and addressee authority. A spelling-ban list in `qa_rules.json` is cheap and very effective.

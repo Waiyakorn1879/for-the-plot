@@ -43,7 +43,7 @@ A flat UTF-8 JSON object mapping each `text` from Contract 1, **byte-identically
 
 - A **missing key means untranslated**, and the delivery mechanism must **fail soft** — display the source text. It must never crash, and it must never render an empty string.
 - Whatever in-band markup the engine parses (`{tags}`, `[variables]`, `<color=…>`, `{0}` placeholders, `\n`) must survive into the output untouched and in the engine's own convention.
-- The patch should be removable. In Ren'Py that means everything lives in `game/tl/<language>/` and uninstalling is deleting one folder; the game's own files are never modified.
+- The patch should be removable. In Ren'Py that means everything lives in `game/<language>_patch/` and uninstalling is deleting one folder; the game's own files are never modified.
 
 ## What is engine-specific and what isn't
 

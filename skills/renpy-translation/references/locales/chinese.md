@@ -18,7 +18,7 @@ Simplified and Traditional are two scripts, and usually two vocabularies. **Ask 
 | `tchinese` (also `zh_tw`, `zh_hk`, `zh_hant`, `chinese_traditional`) | Traditional | Taiwan, Hong Kong |
 | `chinese`, `zh` | not known: refused by the scaffold | scaffold with `--variant`, or set `"orthography": {"variant": "..."}` |
 
-`init_project.py --language schinese` writes the variant into the profile, a `language_name` of "Simplified Chinese", and `validation.target_script: "chinese"`. The language id is also the folder name under `game/tl/`, so keep it a plain identifier (`zh_cn`, not `zh-CN`).
+`init_project.py --language schinese` writes the variant into the profile, a `language_name` of "Simplified Chinese", and `validation.target_script: "chinese"`. The language id is also part of the patch folder name (`game/<id>_patch/`), so keep it a plain identifier (`zh_cn`, not `zh-CN`).
 
 Traditional is not Simplified with the characters swapped. Taiwan and the Mainland use different words for everyday things, so a Traditional translation is written for its region. Say which region in the style guide.
 

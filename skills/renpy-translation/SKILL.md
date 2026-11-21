@@ -10,7 +10,7 @@ description: >
 
 # Ren'Py Game Translation
 
-Full workflow for translating a Ren'Py visual novel into any target language. Work in a dedicated project folder **next to** the game install, never inside it. The game itself is only ever read from — the finished patch is the single thing copied in, at `game/tl/<language>/`.
+Full workflow for translating a Ren'Py visual novel into any target language. Work in a dedicated project folder **next to** the game install, never inside it. The game itself is only ever read from — the finished patch is the single thing copied in, at `game/<language>_patch/`.
 
 ## Pipeline
 
@@ -21,8 +21,8 @@ Full workflow for translating a Ren'Py visual novel into any target language. Wo
 3. Profile     build profile.json + style guide       → references/game-profile.md
 4. Translate   strings → translations.json            → references/translating.md
 5. QA          technical + register checks            → references/qa.md
-6. Patch       translations → game/tl/<lang>/ files   → references/patching.md
-7. Deploy      copy patch into game, launch, verify   → references/patching.md, references/verify-in-engine.md
+6. Patch       translations → game/<lang>_patch/ files   → references/patching.md
+7. Deploy      copy patch into game, launch, verify   → references/patching.md, references/verify-in-engine.md, references/release.md
 ```
 
 Start a new project with `python init_project.py --game <path> --language <id>`: it creates the working folder beside the game with a wired-up `profile.json`, a style-guide skeleton, `qa_rules.json`, a `.gitignore` that keeps game text out of version control, and **`TRANSLATION.md`** — the project's own always-loaded instruction file, with harness stubs (`CLAUDE.md`/`AGENTS.md`/`GEMINI.md`) pointing at it. A translation runs for hundreds of batches across many sessions; rules that live only in chat history get re-broken within ten batches.
@@ -115,7 +115,7 @@ A durable source→translation cache at **`.ftp/translation_memory.json`** (proj
 
 1. **Token preservation is non-negotiable.** Every `[variable]`, `{tag}`, `\n`/`\"` escape, and `%%` in the English must appear in the translation, identical and in the same count. A missing `[mc_name]` or `{/i}` crashes or corrupts rendering; a *duplicated* one is just as broken. `qa_check.py --technical-only` checks all four token classes by multiset — run it before any patch build. Style tags must also stay **nested** the way the English has them (`{b}{i}x{/i}{/b}`, never `{b}{i}x{/b}{/i}`); a crossed close survives the count check but raises in Ren'Py, and QA reports it as `TAGNEST`.
 2. **A translation identical to its source, or containing none of the target script, is not a translation.** It is refused before it can reach the progress store or the Translation Memory, and reported as category 1 by QA. Sources whose only translatable content is a kept proper noun, a variable, a tag, or punctuation are exempt automatically; for anything else that genuinely should stay identical, use `validation.allow_identical`.
-3. **Never modify game source files.** No edits to the game's `.rpy`/`.rpyc`/`.rpa`. The patch lives entirely in `game/tl/<language>/` and is removable by deleting that folder.
+3. **Never modify game source files.** No edits to the game's `.rpy`/`.rpyc`/`.rpa`. The patch lives entirely in `game/<language>_patch/` and is removable by deleting that folder.
 4. **Never translate code-like strings:** label names, image/audio names, transform names, screen ids. The extractor filters most of these; when in doubt, skip and flag.
 5. **Inner monologue markers stay.** Text wrapped in `(...)` (or the game's own convention) keeps its wrapper in the translation.
 6. **Respect the profile's keep-untranslated list** (character names, proper nouns, branded terms) exactly — no transliteration unless the profile says so.

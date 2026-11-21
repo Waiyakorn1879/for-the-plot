@@ -164,3 +164,15 @@ New providers register in `PROVIDERS` in `translate_api.py` (a factory returning
 - Strings that fail twice stay untranslated (they'll display in the original language) — list them at the end from `strings.json` minus progress keys.
 
 **A bulk pass is a draft, not a deliverable.** Follow it with the full QA (`qa_check.py`) and an in-session review of: every flagged issue, all `menu` strings (short strings machine-translate worst), and a random sample of major-character dialog against the style guide.
+
+## Failure modes of a bulk translator (v1.6.5)
+
+Seen over 720 batches from one external translator; check for them with a script, not by eye.
+
+- **Softens crude or explicit lines** "to avoid filters". Audit backward: crude English with no crude marker in the translation.
+- **Adds glosses to English-only strings** (handles, credits, lyrics) only to pass the "contains target script" check. Give such strings an explicit keep-English allow-list instead of forcing target script (rule 3 still holds for everything else).
+- **Invents jokes and self-corrections** the source lacks.
+- **Drifts pronouns per speaker** within a scene; the pronoun belongs to the *pair* and can switch with mood.
+- **Inconsistent nicknames and puns.**
+
+Review loop that worked: a reviewer reads a range of batches and returns findings; a script parses them, applies fixes with token parity, backs up the progress file first (`.bak_<n>`), and each new rule goes into `qa_rules.json` *and* the style guide the same turn, followed by a corpus-wide backward audit. Findings per range fell 40 → 6 as rules became mechanical. The progress file is the truth: never rebuild it from accepted batch files, and deleting keys does nothing while the Translation Memory is on. Record every user decision where the next session reads it; several were re-asked after context compaction.

@@ -1,6 +1,6 @@
 """Build runtime-filter Ren'Py patch files from a translations JSON.
 
-Output (into <out>/tl/<language_id>/):
+Output (into <out>/<language_id>_patch/ by default; <out>/tl/<language_id>/ with --layout tl):
   00_<lang>_filter.rpy   — text filter + toggle key + optional font swap
   01_<lang>_dict.rpy     — generated translation dictionary (optionally split)
   02_<lang>_strings.rpy  — `translate <lang> strings:` blocks for screen/ui
@@ -619,7 +619,12 @@ def main():
     ap.add_argument("--strings", help="strings JSON from extract_strings.py; screen/ui kinds "
                                       "are routed into a translate-strings file "
                                       "(defaults to profile strings_file when it exists)")
-    ap.add_argument("--out", help="output dir (overrides profile output_dir); patch goes to <out>/tl/<lang>/")
+    ap.add_argument("--out", help="output dir (overrides profile output_dir)")
+    ap.add_argument("--layout", choices=("flat", "tl"), default="flat",
+                    help="flat (default): <out>/<lang>_patch/, deploy to game/<lang>_patch/. "
+                         "tl: <out>/tl/<lang>/. Init code under game/tl/<lang>/ loads late and "
+                         "its store variables vanish on save-load (NameError in after_load "
+                         "callbacks), so flat is the safe default")
     ap.add_argument("--split-size", type=int, default=0,
                     help="max entries per dict file (0 = single file)")
     args = ap.parse_args()
@@ -631,7 +636,7 @@ def main():
 
     trans_path = Path(args.translations) if args.translations else base / profile.get("progress_file", "translations.json")
     out_root = Path(args.out) if args.out else base / profile.get("output_dir", "output")
-    out_dir = out_root / "tl" / lang
+    out_dir = out_root / "tl" / lang if args.layout == "tl" else out_root / f"{ident}_patch"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     translations = json.loads(trans_path.read_text(encoding="utf-8"))
@@ -702,8 +707,10 @@ def main():
                           build_strings_rpy(strings_translations, lang, lang_name))
         print(f"Wrote {strings_out} ({len(strings_translations)} screen/UI strings)")
 
-    print(f"\nDeploy: copy {out_dir} into the game's game/tl/ folder "
-          f"(and the target font files into game/).")
+    dest = "game/tl/" if args.layout == "tl" else "game/"
+    print(f"\nDeploy: copy {out_dir} into the game's {dest} folder "
+          f"(and the target font files into game/). Upgrading from another layout: "
+          f"delete the old patch folder first, or both load and crash on duplicates.")
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ The pipeline was proven on a full Thai translation of *Eternum* (released; about
 
 ## What you get
 
-- **`renpy-translation` skill** — the whole workflow: decompiling `.rpa`/`.rpyc`, extracting dialog, setting up per-character speech registers, translating with full Ren'Py tag safety, running QA, and building a drop-in `game/tl/<language>/` patch. Claude Code loads it automatically; every other tool reads the same procedure from [`PLAYBOOK.md`](skills/renpy-translation/PLAYBOOK.md).
+- **`renpy-translation` skill** — the whole workflow: decompiling `.rpa`/`.rpyc`, extracting dialog, setting up per-character speech registers, translating with full Ren'Py tag safety, running QA, and building a drop-in `game/<language>_patch/` patch. Claude Code loads it automatically; every other tool reads the same procedure from [`PLAYBOOK.md`](skills/renpy-translation/PLAYBOOK.md).
 - **Pipeline scripts** (cross-platform Python 3.8+, stdlib-only, tested in CI):
   - `init_project.py` — scaffolds the project folder beside the game: wired-up profile, style-guide skeleton, QA rules, a `.gitignore` that keeps game text out of version control, and `TRANSLATION.md` — the project's own always-loaded instruction file, with `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` stubs pointing at it
   - `extract_strings.py` — pulls dialog, menu choices, on-screen text, and (with `--screens`) GUI/`_()` strings out of `.rpy` files, tagging each with the scene label it came from
@@ -66,7 +66,7 @@ In Claude Code:
 
    > Help me translate this Ren'Py game into French. The game is at D:\Games\SomeGame-1.0-pc
 
-3. It walks the pipeline: decompiles scripts, extracts strings, interviews you to build the game profile (characters, formality rules, what stays untranslated), translates, QAs, and builds a patch you drop into `game/tl/<language>/`.
+3. It walks the pipeline: decompiles scripts, extracts strings, interviews you to build the game profile (characters, formality rules, what stays untranslated), translates, QAs, and builds a patch you drop into `game/<language>_patch/`.
 
 You're always asked which translation method you want before starting — pick one of three:
 

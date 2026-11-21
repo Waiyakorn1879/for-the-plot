@@ -17,7 +17,7 @@ Write down each function name and the name of the list it fills. That's all the 
 
 ## Step 2: The sub-dict file
 
-`tl/<lang>/<subsystem>/00_<subsystem>_dict.rpy` — translations plus two lookup helpers (exact-match with fallback to the original, same crash-proof contract as the main filter):
+`<lang>_patch/<subsystem>/00_<subsystem>_dict.rpy` — translations plus two lookup helpers (exact-match with fallback to the original, same crash-proof contract as the main filter):
 
 ```renpy
 init 5 python:
@@ -39,7 +39,7 @@ init 5 python:
 
 ## Step 3: The wrapper file
 
-`tl/<lang>/<subsystem>/01_<subsystem>_wrappers.rpy`. The two helpers at the top are generic — **never edit them**. Each function you found in Step 1 becomes ONE line between the markers: `_ftp_wrap_array` for array-shape functions, `_ftp_wrap_append` for append-shape functions.
+`<lang>_patch/<subsystem>/01_<subsystem>_wrappers.rpy`. The two helpers at the top are generic — **never edit them**. Each function you found in Step 1 becomes ONE line between the markers: `_ftp_wrap_array` for array-shape functions, `_ftp_wrap_append` for append-shape functions.
 
 ```renpy
 init 5 python:

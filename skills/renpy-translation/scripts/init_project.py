@@ -35,7 +35,7 @@ TRANSLATION_MD = """# {name} — {language_name} translation
 
 Translating **{name}** into {language_name}. The game lives at `{game}` and is
 **read-only**: nothing in this project ever modifies it. The single deliverable
-is `{output_dir}/tl/{language_id}/`, which is copied into the game's `game/tl/`
+is `{output_dir}/{language_id}_patch/`, which is copied into the game's `game/`
 and uninstalls by deleting that one folder.
 
 ## How to resume in a new session
@@ -87,7 +87,7 @@ register quality. A bulk API pass is a draft that always needs review.
 | `strings.json` | extracted source strings (never commit) |
 | `translations.json` | **the progress store — the source of truth** (never commit) |
 | `.ftp/translation_memory.json` | translation cache (never commit) |
-| `{output_dir}/tl/{language_id}/` | the generated patch |
+| `{output_dir}/{language_id}_patch/` | the generated patch |
 | `QC/` | review samples |
 
 ## Established voices

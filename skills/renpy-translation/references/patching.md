@@ -4,7 +4,7 @@
 python build_patch.py --profile profile.json
 ```
 
-Writes to `<output_dir>/tl/<language_id>/`:
+Writes to `<output_dir>/<language_id>_patch/` (`--layout tl` writes `<output_dir>/tl/<language_id>/` instead; see *Where the patch lives*):
 
 - `00_<lang>_filter.rpy` — installs a `config.say_menu_text_filter` hook (exact-match dict lookup, active only when `preferences.language == "<lang>"`), a toggle key, optional auto-set-on-first-launch, and the optional font swap.
 - `01_<lang>_dict.rpy` (more parts with `--split-size`) — the generated English→target dictionary. `init 0`, so it loads after the filter's `init -1` bootstrap.
@@ -43,11 +43,37 @@ With a `font` section in the profile, the filter also: overrides the `font` (and
 
 ## Deploy & verify
 
-1. Copy `<output_dir>/tl/<lang>/` → `<game>/game/tl/<lang>/`, plus font files into `<game>/game/`.
+1. Copy `<output_dir>/<lang>_patch/` → `<game>/game/<lang>_patch/`, plus font files into `<game>/game/`. Upgrading from another layout: delete the old patch folder first (two copies = duplicate definitions = crash).
 2. Launch the game. Ren'Py compiles the patch on first launch — the appearance of `.rpyc` siblings next to your `.rpy` files proves zero syntax errors. A traceback screen instead means a malformed generated file (almost always a quoting issue in the dict; find the line in the traceback).
 3. Switch language (Preferences picker if the game has one, else the toggle key / auto-set) and play a few scenes: dialog, a menu choice, inner monologue, and a scene with `[variables]` in text.
-4. Uninstall = delete `<game>/game/tl/<lang>/`. Nothing else is touched.
+4. **Load a save** (same session and after a restart): the release-blocking check, see `verify-in-engine.md`.
+5. Uninstall = delete `<game>/game/<lang>_patch/`. Nothing else is touched.
 
 ## Custom text subsystems (phones, computers, social feeds)
 
 Text built dynamically in Python (chat histories, feed posts) is reachable by neither the say filter nor `translate strings`. It needs the wrapper-sub-dict pattern — full recipe with a proven code template in `custom-subsystems.md`. Budget real time for this and confirm scope with the user before committing to it.
+
+## Where the patch lives (v1.6.5)
+
+**Never put init code under `game/tl/<lang>/`.** Ren'Py loads that folder late, and the store snapshot a save-load restores does not contain variables defined there, so the callbacks in `config` (which survive) hit `NameError` the moment a save is loaded. It reproduces on every launch, even with `config.default_language` set, and a script-only check never sees it. `build_patch.py` therefore defaults to `--layout flat` (`game/<lang>_patch/`, always loaded at init; the hooks already check the active language at runtime, so players on English are unaffected). `--layout tl` remains for native `translate` blocks, which are language data, not code. Custom hooks you add (first-launch switch, credit screen) go in `game/` or the patch folder, never `tl/`.
+
+## Runtime-hook facts (verified on Ren'Py 8.3.4)
+
+- **`config.replace_text` gets each text segment *between tags*, not the whole string.** `"{u}HEADER{/u}\nBody"` arrives as `HEADER`, then `Body` (the `\n` is its own token, and a space after it stays on the segment). A tagged or multi-line string needs one key per segment, plus the body without its leading `\n` / space.
+- **`config.say_menu_text_filter` receives the raw say text, not the speaker.** Speaker-specific overrides use the Say-frame lookup in the generated filter.
+- **Engine text is unescaped** (real newline, bare quote); `strings.json` keeps source escapes (`\n`, `\"`). A lookup that misses for no visible reason is usually this. Dump the say statements a real run executes and diff them against `strings.json` (the *engine hit rate*; one project measured 30,050 hit / 169 miss / 0 bad).
+- **Engine-mutated text** (`.upper()`, `.replace("_"," ")`, `"{} Game".format(...)`) cannot match a stored key. Options: a case-insensitive lookup restricted to text that equals its own upper-case, a small manual map for derived strings, segment keys.
+- **Ren'Py's own UI** (Quit / Main Menu / overwrite and delete confirmations, save-slot strings) is not in the game source at all. Add the common ones by hand.
+- **Chain, never replace**, any existing `replace_text` / filter. A test harness that installs its own wrapper *before* the language switch captures the pre-language function and silently disables the real one.
+- **A swallowed exception looks like "text stays English".** Hooks must not raise, so count and log what they swallow behind a debug flag.
+- `translate <lang> strings:` and `translate <lang> style <name>:` work from any file; an empty `translate <lang> python: pass` registers the language.
+
+## First launch and main menu
+
+- `renpy.change_language()` cannot run at init. Call it once from a `config.periodic_callbacks` function and flag it in `persistent`, so the player can pick English afterwards.
+- `config.overlay_screens` do **not** draw on the main menu. Show a credit screen from a periodic callback when `renpy.get_screen("main_menu")` exists, and **re-show it whenever a new `main_menu` instance appears** (a language change rebuilds the menu and drops the screen). Keep both in `game/`, not in the patch folder, so they work in any language state.
+- **Never translate name data.** `Character` hashing and relationship dicts are keyed on `.name`. Swap names at render time with an exact-match `replace_text`, and skip the swap on credit screens (a staff member named "Adam" must stay a name).
+
+## Not fixable by a text patch
+
+Main-menu buttons, quick-menu bars, headings and popups drawn as bitmaps carry their text in the image. List them in the delivered README as *needs image editing*; a scan for imagebuttons with no `Text` finds them. Text that outgrows a fixed box is visible only in a screenshot.

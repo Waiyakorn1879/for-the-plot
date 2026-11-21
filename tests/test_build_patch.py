@@ -164,7 +164,7 @@ class TestKindRouting:
              "--profile", str(tmp_path / "profile.json")],
             check=True, capture_output=True, text=True, encoding="utf-8",
         )
-        return tmp_path / "out" / "tl" / "french"
+        return tmp_path / "out" / "french_patch"
 
     def test_routing_with_strings_file(self, tmp_path):
         out = self.run_build(tmp_path, with_strings=True)
@@ -204,7 +204,7 @@ class TestKindRouting:
              "--profile", str(tmp_path / "profile.json")],
             check=True, capture_output=True, text=True, encoding="utf-8",
         )
-        content = (tmp_path / "out" / "tl" / "french" / "02_french_strings.rpy"
+        content = (tmp_path / "out" / "french_patch" / "02_french_strings.rpy"
                    ).read_text(encoding="utf-8")
         assert '    old "She yelled, \\"Watch out for [enemy_name]!\\""' in content
         assert '    new "Elle a crié : \\"Attention à [enemy_name] !\\""' in content
@@ -322,7 +322,7 @@ def test_bad_speaker_overrides_are_not_shipped(tmp_path):
                           capture_output=True, text=True, encoding="utf-8")
     assert proc.returncode == 0, proc.stderr
     assert "2 override(s) NOT shipped" in proc.stdout
-    built = (tmp_path / "out" / "tl" / "thai" / "01_thai_dict.rpy").read_text(encoding="utf-8")
+    built = (tmp_path / "out" / "thai_patch" / "01_thai_dict.rpy").read_text(encoding="utf-8")
     assert "(u'c', u'Thanks [n].'): u'ขอบคุณครับ [n]'" in built
     assert "(u'a'," not in built and "(u'b'," not in built
 
@@ -354,3 +354,15 @@ def test_alternates_are_emitted_and_load_as_the_same_translation():
     # nothing to add -> output is unchanged from before this feature
     plain = dict(bp.build_dict_rpy({"Plain.": "B"}, "x", "X"))[0]
     assert "alternate" not in plain and plain.count(".update(") == 1
+
+
+def test_layout_flag(tmp_path):
+    (tmp_path / "profile.json").write_text(json.dumps({
+        "game_name": "G", "language_id": "french", "language_name": "French",
+        "progress_file": "tr.json", "output_dir": "out"}), encoding="utf-8")
+    (tmp_path / "tr.json").write_text(json.dumps({"Hi": "Salut"}), encoding="utf-8")
+    for extra, where in (([], "french_patch"), (["--layout", "tl"], "tl/french")):
+        subprocess.run([sys.executable, str(SCRIPTS_DIR / "build_patch.py"),
+                        "--profile", str(tmp_path / "profile.json"), *extra],
+                       check=True, capture_output=True, text=True, encoding="utf-8")
+        assert (tmp_path / "out" / where / "00_french_filter.rpy").is_file()
