@@ -39,6 +39,7 @@ from characters import (
     is_monologue, missing_must_use, register_rules, resolve_alias,
 )
 import orthography
+import style_rules
 import punctuation
 import terminology
 from relationships import build_resolver
@@ -231,7 +232,11 @@ def main():
     # qa_rules.json shadows the generated one rather than duplicating it.
     speakers = profile.get("speakers", {})
     language = profile.get("language_id")
-    generated = register_rules(speakers, language)
+    style = profile.get("style_rules") or []
+    bad = style_rules.problems(style)
+    if bad:
+        sys.exit("style_rules: " + "; ".join(bad))
+    generated = register_rules(speakers, language) + style_rules.qa_rules(style, speakers)
     grammar = gender_grammar(language)
     if grammar:
         # Speakers with no record at all are unknown: unisex speech, like extras.
@@ -332,7 +337,7 @@ def main():
                 continue
             if rule.get("skip_monologue") and is_monologue(text):
                 continue
-            if not rule["_re"].search(seen_tr):
+            if not rule["_re"].search(style_rules.strip_exceptions(seen_tr, rule)):
                 continue
             if not near_condition_met(rule, ctx, groups, s, speakers):
                 continue

@@ -170,6 +170,26 @@
       "type": "string",
       "description": "Declarative register/phrasing rules for qa_check.py. See references/qa.md."
     },
+    "style_rules": {
+      "type": "array",
+      "description": "Style rules compiled into both the translation prompt and QA (v1.7.0). See references/qa.md, Style rules.",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string"},
+          "say": {"type": "string", "description": "Prompt text; with no forbid the rule is prompt-only"},
+          "forbid": {"type": "array", "items": {"type": "string"}},
+          "mode": {"enum": ["strict", "standalone"]},
+          "except_in": {"type": "array", "items": {"type": "string"}, "description": "standalone only: compounds where the term is valid"},
+          "use": {"type": "string"},
+          "category": {"enum": [2, 3, 4]},
+          "speakers": {"type": "array", "items": {"type": "string"}},
+          "speakers_where": {"type": "object", "description": "match character-record attributes"},
+          "to": {"type": "array", "items": {"type": "string"}, "description": "resolved addressee; needs category 3"}
+        }
+      }
+    },
     "terminology_file": {
       "type": "string",
       "description": "Terminology dictionary JSON (default terminology.json). keep_untranslated migrates into it as APPROVED keep terms; see references/terminology.md"

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0
+
+**Style Rules Engine.** A style rule is defined once and enforced at both ends: the translation prompt tells the model, and QA checks the answer.
+
+- **New `style_rules.py`** and profile key `style_rules` (see `references/qa.md`, *Style rules*). Each rule compiles into a `STYLE RULES` block in the user message (the system prompt stays static, so provider caching still works) and into a `style: <name>` QA rule.
+- **`mode: standalone`** with `except_in`: a term forbidden as a word of its own but valid inside listed compounds. QA removes those exact compounds before matching, so no lookaround is needed. `mode: strict` is the default.
+- **Scope by character attribute** (`speakers_where: {"gender": "female"}`) as well as by code; aliases included. A scoped rule appears in the prompt only for batches that contain its speakers.
+- **Prompt-only rules** (`say` with no `forbid`) for guidance QA cannot check: emphasis markup, tone, idiom traps.
+- **Stops on a malformed rule** in `qa_check.py` and `translate_api.py`. Additive: a project without `style_rules` behaves exactly as before.
+
 ## 1.6.5
 
 From a field report on a finished 26,800-string project (a release-candidate patch whose first external tester crashed on loading a save).

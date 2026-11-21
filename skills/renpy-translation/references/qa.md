@@ -171,3 +171,25 @@ Also run `find_twins.py --profile profile.json` before building: it fails while 
 ## Speaker overrides
 
 `speaker_translations.json` (see `speaker_overrides.py`) is part of what QA checks. Every override gets the category-1 checks and is reported with an `OVERRIDE` prefix; register rules judge a speaker on their override when one exists, and on the dictionary entry otherwise. `build_patch.py` applies the same gate and leaves a failing override out of the patch, so that line falls back to the dictionary translation.
+
+## Style rules: one definition, prompt and QA (v1.7.0)
+
+Anything you would otherwise write twice (once as a sentence in the style guide, once as a regex in `qa_rules.json`) belongs in the profile's `style_rules`. `style_rules.py` compiles each record into a line of the translation prompt **and** a QA rule, so the translator is told exactly what the gate will reject.
+
+```json
+"style_rules": [
+  {"name": "no synonym stacking", "say": "One word, never two near-synonyms in a row."},
+  {"name": "no gutter pronouns for refined women",
+   "forbid": ["กู", "มึง"], "category": 2,
+   "speakers_where": {"gender": "female", "register": "refined"}},
+  {"name": "bare กู is a pronoun, not a prefix", "mode": "standalone",
+   "forbid": ["กู"], "except_in": ["กูเกิล"], "use": "ฉัน"}
+]
+```
+
+- `say`: prompt text. With no `forbid` it is prompt-only (emphasis markup, tone, idiom traps) and QA has nothing to check.
+- `forbid`: literal terms. QA reports a hit as `style: <name>`. Category 4 by default (review); use 2 or 3 only for a rule you trust to block a build. Category 3 needs `to` and fires only where the addressee resolved.
+- `mode`: `strict` (default, never acceptable) or `standalone` (forbidden as a word of its own, valid inside the compounds in `except_in`; QA removes those exact compounds before matching). The exclusions are literals on purpose: in an unspaced script a lookaround hides real violations.
+- Scope: `speakers` (codes) or `speakers_where` (any attribute of the character record, so a rule follows the cast instead of a hardcoded list). Aliases are included. A scoped rule is left out of the prompt for batches that do not contain its speakers.
+- A malformed rule stops `qa_check.py` and `translate_api.py` with a message.
+- A rule in `qa_rules.json` with the same `name` as a generated one shadows it, as with character rules. Context rules (`near`) and `pairs` stay in `qa_rules.json`.

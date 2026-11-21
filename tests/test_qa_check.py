@@ -622,3 +622,17 @@ def test_roman_check_ignores_words_inside_tokens(tmp_path):
                                       "η {color=#ffffff}πόρτα{/color} door."})
     assert "roman:partner" not in proc.stdout and "roman:color" not in proc.stdout
     assert "roman:door" in proc.stdout
+
+
+def test_style_rules_end_to_end(tmp_path):
+    rules = [{"name": "no grr", "mode": "standalone", "forbid": ["GRR"],
+              "except_in": ["GRRR"], "category": 2, "speakers": ["mc"]}]
+    out = run_qa(tmp_path, [say("a", "mc", 1), say("b", "mc", 2)],
+                 {"a": "α GRR", "b": "β GRRR"}, profile_extra={"style_rules": rules}).stdout
+    assert "style: no grr" in out and out.count("style: no grr") == 1
+
+
+def test_bad_style_rule_stops(tmp_path):
+    p = run_qa(tmp_path, [say("a", "mc", 1)], {"a": "α"},
+               profile_extra={"style_rules": [{"name": "x"}]})
+    assert p.returncode != 0 and "style_rules" in (p.stderr + p.stdout)

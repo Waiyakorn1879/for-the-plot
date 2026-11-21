@@ -92,3 +92,7 @@ Keep `translation-guide.md` for the *reasoning* and anything prose-shaped. Two `
 ## Maintaining the profile
 
 The profile is living documentation. When the user corrects a translation pattern ("X should never use pronoun Y"), update `translation-guide.md` AND add a `qa_rules.json` rule enforcing it — corrections that only live in chat history get lost. Then run the **backward audit** (`qa.md`): the rule you just learned was broken in everything translated before you learned it, and `qa_check.py` re-scans the whole corpus every run, so the back catalogue comes free.
+
+## `style_rules` (v1.7.0)
+
+Optional list of rules compiled into both the translation prompt and QA. See `qa.md`, *Style rules*.

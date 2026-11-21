@@ -32,6 +32,7 @@ import urllib.request
 from pathlib import Path
 
 import orthography
+import style_rules
 import terminology
 from characters import (cast_block, character_line, display_name, gender_grammar,
                         resolve_alias, speech_gender)
@@ -560,7 +561,7 @@ RETRY_NAGS = {
 
 
 def translate_batch(call_model, system, speakers, lang_name, batch,
-                    retry=False, reasons=("TOKEN",), resolver=None, terms=(), previous=None):
+                    retry=False, reasons=("TOKEN",), resolver=None, terms=(), previous=None, style=()):
     """batch: list of {id, text, speaker, kind}. Returns list of {id, tr}.
 
     `reasons` selects the retry nag(s). Telling a model its tokens mismatched
@@ -579,6 +580,8 @@ def translate_batch(call_model, system, speakers, lang_name, batch,
     # Terminology guidance rides in the USER message, like the cast block: the
     # system prompt stays static so provider prompt caching keeps working.
     glossary = terminology.guidance_block([item["text"] for item in batch], terms)
+    # Style rules ride here too (user message, system prompt stays static).
+    style_text = style_rules.prompt_block(style, speakers, [item["speaker"] for item in batch])
 
     lines = []
     for item in batch:
@@ -599,6 +602,7 @@ def translate_batch(call_model, system, speakers, lang_name, batch,
     user_msg = (f"Translate these lines to {lang_name}. Output JSON array only.\n\n"
                 + (cast + "\n\n" if cast else "")
                 + (glossary + "\n\n" if glossary else "")
+                + (style_text + "\n\n" if style_text else "")
                 + "[\n" + ",\n".join(lines) + "\n]")
 
     if retry:
@@ -791,6 +795,10 @@ def main():
     # and the TM context must name the same person for the same line, or the
     # variant a run writes is not the variant the next run retrieves.
     resolver = build_resolver(profile, strings)
+    style = profile.get("style_rules") or []
+    bad = style_rules.problems(style)
+    if bad:
+        sys.exit("style_rules: " + "; ".join(bad))
     if resolver.enabled:
         resolved = sum(1 for e in strings if resolver.target_for(e))
         print(f"Addressee resolution: on (min_confidence="
@@ -894,13 +902,13 @@ def main():
         print(f"\nBatch {batch_num} ({i+1}-{i+len(batch)} of {len(todo)})...")
         try:
             result = translate_batch(call_model, system, speakers, lang_name, batch,
-                                     resolver=resolver, terms=policy["terms"])
+                                     resolver=resolver, terms=policy["terms"], style=style)
         except Exception as e:
             print(f"  API error: {e}. Sleeping 10s and retrying once.")
             time.sleep(10)
             try:
                 result = translate_batch(call_model, system, speakers, lang_name,
-                                         batch, resolver=resolver, terms=policy["terms"])
+                                         batch, resolver=resolver, terms=policy["terms"], style=style)
             except Exception as e2:
                 print(f"  Still failing: {e2}. Skipping batch.")
                 continue
@@ -934,7 +942,7 @@ def main():
                 retry_result = translate_batch(call_model, system, speakers, lang_name,
                                                [item for item, _ in mismatches],
                                                retry=True, reasons=codes,
-                                               resolver=resolver, terms=policy["terms"],
+                                               resolver=resolver, terms=policy["terms"], style=style,
                                                previous=id_to_tr)
             except Exception as e:
                 print(f"  Retry failed: {e}. Keeping what passed.")
